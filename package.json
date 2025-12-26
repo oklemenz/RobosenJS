@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "start": "node main",
+    "lint": "npm run prettier && eslint . --fix",
+    "prettier": "prettier \"**/*.{js,json,md,html}\" --write --log-level error"
+  },
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-26"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "eslint-config": "^0.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.7.4"
+  }
+}
