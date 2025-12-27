@@ -13,12 +13,12 @@
 #### Programming
 
 ```js
-const K1 = new Robot("K1");
-await K1.start();
-await K1.peform("Left Punch");
-await K1.stop();
+const k1 = new Robot("K1");
+await k1.start();
+await k1.action("Left Punch");
+await k1.stop();
 ```
 
 #### Specification
 
-- K1 specification and all commands can be found at [robot/K1.json](robot/K1.json).
+- K1 specification and all commands can be found at [robot/K1.json](src/robot/K1.json).

@@ -1,17 +1,44 @@
 {
+  "name": "robosen",
+  "version": "1.0.0",
+  "description": "Robosen",
+  "main": "src/robot.js",
+  "bin": {
+    "k1": "bin/k1.js"
+  },
   "scripts": {
-    "start": "node main",
+    "test": "jest .",
+    "start": "node scripts/main",
+    "control": "node scripts/control",
+    "main": "node scripts/main",
+    "repl": "node scripts/repl",
     "lint": "npm run prettier && eslint . --fix",
     "prettier": "prettier \"**/*.{js,json,md,html}\" --write --log-level error"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oklemenz/Robosen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oklemenz/Robosen/issues"
+  },
+  "homepage": "https://github.com/oklemenz/Robosen#readme",
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
-    "@abandonware/noble": "^1.9.2-26"
+    "@abandonware/noble": "^1.9.2-26",
+    "node-hid": "^3.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "eslint": "^9.39.2",
-    "eslint-config": "^0.3.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jest": "^29.11.0",
+    "eslint-plugin-n": "^17.23.1",
+    "globals": "^16.5.0",
+    "jest": "^30.2.0",
     "prettier": "^3.7.4"
-  }
+  },
+  "license": "Apache-2.0"
 }

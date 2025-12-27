@@ -1,0 +1,354 @@
+{
+  "code": "K1",
+  "name": "K1-000Q5",
+  "manufacturerUuid": "15b1",
+  "serviceUuid": "ffe0",
+  "characteristicsUuid": "ffe1",
+  "header": "ffff",
+  "announcementDelay": 2000,
+  "verbose": true,
+  "timeout": 5000,
+  "action": "ProAction",
+  "commands": {
+    "_start": "32",
+    "_end": "64",
+    "ProAction": {
+      "_type": "17",
+      "Appreciation": {
+        "timeout": 5000
+      },
+      "Back Flip": {},
+      "Battle State": {
+        "timeout": 2000
+      },
+      "Bow, Please": {},
+      "Crazy": {},
+      "Cross Arms": {},
+      "Crouch Down": {},
+      "Do Dog Barks": {},
+      "Do Exercise": {},
+      "Do Squats": {},
+      "Fire In The Hole!": {},
+      "Front Flip": {},
+      "Handstand": {},
+      "Kneel,Please": {},
+      "Kung Fu": {},
+      "Lay Down": {},
+      "Left Kick": {},
+      "Left Punch": {},
+      "Mountain Running": {},
+      "Play Cool": {},
+      "Play Dead": {},
+      "Pretend To Fart": {},
+      "Push Ups": {},
+      "Right Kick": {},
+      "Right Punch": {},
+      "Take A Pee": {},
+      "Take A Poop": {},
+      "Take A Seat": {},
+      "Twist Butt": {},
+      "Bend Back": {},
+      "Celebrate": {},
+      "Close Combat": {},
+      "Defend The Enemies": {},
+      "Do Cat Meows": {},
+      "Double Punch": {},
+      "Horse Stance": {},
+      "Keep Rolling Backward": {},
+      "Launch Cannon": {},
+      "Lay Face Down": {},
+      "Lean Back": {},
+      "Lean Forward": {},
+      "Open Fire": {},
+      "Play Drum": {},
+      "Propose": {},
+      "Ready To Strafe": {},
+      "Say Hello": {},
+      "Start Shooting": {},
+      "Swing Arms": {},
+      "Swing Left To Right": {},
+      "Swing Left": {},
+      "Swing Right": {},
+      "Tilt Left": {},
+      "Tilt Right": {},
+      "Wave Hands": {},
+      "Yield": {}
+    },
+    "Stage": {
+      "Open Arms": {},
+      "Spread Legs": {},
+      "Chinese Bow": {},
+      "Wave Hello": {},
+      "Quat": {},
+      "Ready To Fight": {},
+      "Eviction Warning": {},
+      "Close Combat": {},
+      "Persuade Enemies": {},
+      "Celebrate Victory": {},
+      "Warm-Up": {},
+      "Stretch Muscle": {},
+      "Kung Fu Punch": {},
+      "Swing Left To Right": {},
+      "Push-Ups": {}
+    },
+    "Dance": {
+      "Artificial Intelligence": {},
+      "Boogaloo": {},
+      "Cyberpunk": {},
+      "Digital Night": {},
+      "Funky Wiggle": {},
+      "Lay Back": {},
+      "Mechanical Beats": {},
+      "Robot Talk": {},
+      "Rocking Soul": {},
+      "Funny": {},
+      "Easy Action": {},
+      "The Squat": {}
+    },
+    "Other": {
+      "Leg Press": {},
+      "The Splits": {}
+    },
+    "Voice": {
+      "Programming": {},
+      "Executing": {},
+      "Cancel": {},
+      "Volume Up": {},
+      "Volume Down": {},
+      "Shutdown": {},
+      "Move Forward": {},
+      "Come Back": {},
+      "Turn Left": {},
+      "Turn Right": {},
+      "Turn Around": {},
+      "Move Left": {},
+      "Move Right": {},
+      "Raise Left Hand": {},
+      "Raise Right Hand": {},
+      "Raise Your Hands": {},
+      "Left Punch": {},
+      "Right Punch": {},
+      "Double Punch": {},
+      "Crouch Down": {
+        "pro": true
+      },
+      "Bow, Please": {
+        "pro": true
+      },
+      "Lay Face Down": {
+        "pro": true
+      },
+      "Lay Down": {
+        "pro": true
+      },
+      "Say Hello": {},
+      "Close Combat": {},
+      "Crazy": {
+        "pro": true
+      },
+      "Horse Stance": {
+        "pro": true
+      },
+      "Kung Fu": {
+        "pro": true
+      },
+      "Twist Butt": {
+        "pro": true
+      },
+      "Push Ups": {},
+      "Dance Now": {},
+      "Play Next": {},
+      "Showtime": {},
+      "Pretend To Fart": {
+        "pro": true
+      },
+      "Take A Pee": {
+        "pro": true
+      },
+      "Play Dead": {},
+      "Task A Poop": {
+        "pro": true
+      },
+      "Do Dog Barks": {},
+      "Do Cat Meows": {},
+      "Play Cool": {
+        "pro": true
+      },
+      "Swing Left": {
+        "pro": true
+      },
+      "Swing Right": {
+        "pro": true
+      },
+      "Lean Forward": {
+        "pro": true
+      },
+      "Lean Back": {
+        "pro": true
+      },
+      "Propose": {
+        "pro": true
+      },
+      "Knee,Please": {
+        "pro": true
+      },
+      "Handstand": {},
+      "Open Arms": {
+        "pro": true
+      },
+      "Pose To Take Off": {
+        "pro": true
+      },
+      "Defend The Enemies": {},
+      "Celebrate": {
+        "pro": true
+      },
+      "Wave Hands": {
+        "pro": true
+      },
+      "Swing Left To Right": {
+        "pro": true
+      },
+      "Take A Seat": {
+        "pro": true
+      },
+      "Tilt Your Arms": {
+        "pro": true
+      },
+      "Tilt Your Left Arm": {
+        "pro": true
+      },
+      "Tilt Your Right Arm": {
+        "pro": true
+      },
+      "Tilt Left": {
+        "pro": true
+      },
+      "Tilt Right": {
+        "pro": true
+      },
+      "Cross Arms": {
+        "pro": true
+      },
+      "Battle State": {
+        "pro": true
+      },
+      "Bend Back": {},
+      "Do Squats": {
+        "pro": true
+      },
+      "Mountain Running": {
+        "pro": true
+      },
+      "Ready To Strafe": {},
+      "Appreciation": {
+        "pro": true
+      },
+      "Yield": {
+        "pro": true
+      },
+      "Resume Standing": {
+        "pro": true
+      },
+      "Swing Arms": {},
+      "Front Flip": {},
+      "Back Flip": {
+        "pro": true
+      },
+      "Shake Head": {},
+      "Keep Rolling Backward": {
+        "pro": true
+      },
+      "Play Drum": {},
+      "Do Exercise": {},
+      "Open Fire": {},
+      "Launch Cannon": {},
+      "Start Shooting": {},
+      "Fire In The Hole!": {},
+      "Open Legs": {
+        "pro": true
+      },
+      "Chest Up": {
+        "pro": true
+      }
+    },
+    "Control": {
+      "Move Forward": {},
+      "Move Backwards": {},
+      "Turn Left": {},
+      "Turn Right": {},
+      "Move Left": {},
+      "Move Right": {},
+      "Initial Position": {}
+    },
+    "Joint": {
+      "Head": {},
+      "Left Shoulder": {},
+      "Right Shoulder": {},
+      "Left Arm": {},
+      "Right Arm": {},
+      "Left Hand": {},
+      "Right Hand": {},
+      "Left Hip": {},
+      "Right Hip": {},
+      "Left Thigh": {},
+      "Right Thigh": {},
+      "Left Calf": {},
+      "Right Calf": {},
+      "Left Ankle": {},
+      "Right Ankle": {},
+      "Left Foot": {},
+      "Right Foot": {}
+    }
+  },
+  "controller": {
+    "ProController": {
+      "vendorId": 1406,
+      "productId": 8201,
+      "product": "Pro Controller",
+      "usagePage": 1,
+      "usage": 5,
+      "deadzone": 0.2,
+      "buttons": {
+        "3": {
+          "Y": 1,
+          "X": 2,
+          "B": 4,
+          "A": 8,
+          "R": 64,
+          "ZR": 128
+        },
+        "4": {
+          "Minus": 1,
+          "Plus": 2,
+          "RightStick": 4,
+          "LeftStick": 8,
+          "Home": 16,
+          "Capture": 32
+        },
+        "5": {
+          "DPadDown": 1,
+          "DPadUp": 2,
+          "DPadRight": 4,
+          "DPadLeft": 8,
+          "L": 64,
+          "ZL": 128
+        }
+      },
+      "axes": {
+        "6": {
+          "LeftStickX": 1
+        },
+        "8": {
+          "LeftStickY": -1
+        },
+        "9": {
+          "RightStickX": 1
+        },
+        "11": {
+          "RightStickY": -1
+        }
+      }
+    }
+  }
+}
