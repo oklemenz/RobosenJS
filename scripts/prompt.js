@@ -3,8 +3,7 @@
 const Robot = require("../src/robot");
 
 (async function main() {
-  const k1 = new Robot("k1");
+  const k1 = new Robot("K1");
   await k1.start();
-  await k1.action("Left Punch");
-  await k1.end();
+  k1.prompt();
 })();

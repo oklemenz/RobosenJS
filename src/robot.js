@@ -32,7 +32,7 @@ module.exports = class Robot {
         }
         const command = this.config.commands[type][name];
         command.kind = "data";
-        command.type = type;
+        command.typeName = type;
         command.name = name;
         command.data = `${type}/${name}`;
       }
@@ -47,10 +47,11 @@ module.exports = class Robot {
   }
 
   async start() {
-    this.log("Waiting for Bluetooth powered on...");
+    this.log("Waiting for Bluetooth powered on ...");
     await new Promise((resolve) => {
       noble.on("stateChange", (state) => {
         if (state === "poweredOn") {
+          this.log("Bluetooth powered on");
           resolve(state);
         } else {
           this.log("Waiting for Bluetooth powered on from", state);
@@ -79,18 +80,27 @@ module.exports = class Robot {
     this.state = STATE.READY;
   }
 
-  async stop() {
+  async stop(end = false) {
     if (this.characteristic) {
-      await this.characteristic.unsubscribeAsync().catch(() => {});
+      await this.characteristic.unsubscribeAsync();
       this.characteristic = null;
     }
     if (this.peripheral) {
-      await this.peripheral.disconnectAsync().catch(() => {});
+      await this.peripheral.disconnectAsync();
       this.peripheral = null;
     }
-    await noble.stopScanningAsync().catch(() => {});
+    await noble.stopScanningAsync();
+    noble.removeAllListeners();
     this.log("Disconnected from", this.name);
     this.state = STATE.INITIAL;
+    if (end) {
+      // eslint-disable-next-line
+      process.exit(0);
+    }
+  }
+
+  async end() {
+    return this.stop(true);
   }
 
   async #connect() {
@@ -104,7 +114,7 @@ module.exports = class Robot {
     await characteristic.subscribeAsync();
     characteristic.on("data", (data) => {
       const packet = this.parsePacket(data);
-      this.log("Response", packet);
+      this.log(this.config.indent + "Response", packet.toString());
     });
     return characteristic;
   }
@@ -152,19 +162,25 @@ module.exports = class Robot {
     }
     this.log(`Performing ${command.data}`);
     const timeout =
+      (command?.duration
+        ? command?.duration + this.config.durationBuffer
+        : undefined) ??
       command?.timeout ??
-      this.config.commands._timeout ??
-      this.config.commands[command.type]._timeout ??
+      this.config.commands[command.typeName]._timeout ??
       this.config.timeout;
     await this.perform(async () => {
-      await this.send(command);
+      return await this.send(command);
     }, timeout);
     this.log(`Finished ${command.data}`);
   }
 
   async perform(callback, timeout) {
+    if (this.state === STATE.BUSY) {
+      this.log("Busy ...");
+      return;
+    }
     if (this.state !== STATE.READY) {
-      this.log("Not ready");
+      this.log("Not ready!");
       return;
     }
     this.state = STATE.BUSY;
@@ -176,10 +192,7 @@ module.exports = class Robot {
       }, timeout);
       const fnData = (data) => {
         const packet = this.parsePacket(data);
-        if (packet.kind === "start") {
-          this.log("Start");
-        } else if (packet.kind === "end") {
-          this.log("End");
+        if (packet.kind === "completed") {
           clearTimeout(handle);
           this.characteristic.off("data", fnData);
           resolve();
@@ -191,16 +204,19 @@ module.exports = class Robot {
     await callback();
     await done;
     const elapsedMs = performance.now() - start;
-    this.log("Elapsed", `${elapsedMs.toFixed(0)} ms`);
+    this.log(this.config.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     this.state = STATE.READY;
   }
 
   async send(command) {
-    await this.characteristic.writeAsync(this.packetCommand(command), false);
+    return await this.characteristic.writeAsync(
+      this.packetCommand(command),
+      false,
+    );
   }
 
   packetCommand(command) {
-    const type = command.type ?? this.config.commands[command.type]._type;
+    const type = command.type ?? this.config.commands[command.typeName]._id;
     return this.packet(type, command.data);
   }
 
@@ -227,7 +243,6 @@ module.exports = class Robot {
     if (!Buffer.isBuffer(buffer)) {
       return { kind: "invalid", raw: buffer };
     }
-    let kind = "data";
     const hex = buffer.toString("hex");
     if (!hex.startsWith("ffff") || hex.length < 10) {
       return { kind: "invalid", raw: buffer };
@@ -237,18 +252,23 @@ module.exports = class Robot {
     const type = body.slice(2, 4);
     const data = body.slice(4);
     const checksum = hex.slice(-2);
-    if (data === this.config.commands._start) {
-      kind = "start";
-    } else if (data === this.config.commands._end) {
-      kind = "end";
+    let kind = "data";
+    const bytes = Buffer.from(data, "hex");
+    let value = bytes.toString();
+    if (bytes.length === 1) {
+      value = parseInt(data, 16);
+      kind = value === 100 ? "completed" : "progress";
     }
     const command = {
       kind,
       type,
-      data: Buffer.from(data, "hex").toString(),
+      data: value,
       checksum,
       valid: parseInt(checksum, 16) === this.checksum(Buffer.from(body, "hex")),
       raw: buffer,
+      toString: () => {
+        return `<packet kind=${kind} data=${value}>`;
+      },
     };
     return command;
   }
@@ -263,6 +283,14 @@ module.exports = class Robot {
 
   async wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  prompt() {
+    // TODO: implement
+  }
+
+  voice() {
+    // TODO: implement
   }
 
   control() {
@@ -292,37 +320,39 @@ module.exports = class Robot {
           },
         };
         controller.on("data", (data) => {
-          for (const location in config.buttons) {
-            for (const button in config.buttons[location]) {
-              const bit = config.buttons[location][button];
-              const offset = parseInt(location);
-              this.controller.buttons[button] =
-                (data[offset] & bit) !== 0 ? 1 : 0;
+          for (const name in config.buttons) {
+            const button = config.buttons[name];
+            const offset = parseInt(button.index);
+            const value = (data[offset] & button.value) !== 0 ? 1 : 0;
+            const previous = this.controller.buttons[name];
+            this.controller.buttons[name] = value;
+            if (!previous && value) {
+              if (button.action) {
+                this.action(button.action);
+              }
             }
           }
-          for (const location in config.axes) {
-            for (const axis in config.axes[location]) {
-              const bit = config.axes[location][axis];
-              const offset = parseInt(location);
-              let value = data[offset];
-              if (bit === 1) {
-                value = value | ((data[offset + 1] & 0x0f) << 8);
-              } else if (bit === -1) {
-                value = (data[offset - 1] >> 4) | (value << 4);
-              }
-              if (bit === 0) {
-                value = (value - 128) / 128;
-              } else {
-                value = (value - 2048) / 2048;
-              }
-              value = Math.max(-1, Math.min(1, value));
-              if (Math.abs(value) < config.deadzone) {
-                value = 0;
-              }
-              this.controller.axes.values[axis] = value;
-              this.controller.axes.states[axis] =
-                value === 0 ? 0 : value > 0 ? 1 : -1;
+          for (const name in config.axes) {
+            const axis = config.axes[name];
+            const offset = parseInt(axis.index);
+            let value = data[offset];
+            if (axis.extend === 4) {
+              value = value | ((data[offset + 1] & 0x0f) << 8);
+            } else if (axis.extend === -4) {
+              value = (data[offset - 1] >> 4) | (value << 4);
             }
+            if (Math.abs(axis.extend) === 4) {
+              value = (value - 2048) / 2048;
+            } else {
+              value = (value - 128) / 128;
+            }
+            value = Math.max(-1, Math.min(1, value));
+            if (Math.abs(value) < config.deadZone) {
+              value = 0;
+            }
+            this.controller.axes.values[name] = value;
+            this.controller.axes.states[name] =
+              value === 0 ? 0 : value > 0 ? 1 : -1;
           }
         });
         controller.on("error", (err) => {

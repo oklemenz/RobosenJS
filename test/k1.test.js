@@ -29,26 +29,26 @@ describe("K1", () => {
     });
   });
 
-  test("parse start packet", () => {
+  test("parse 50% progress packet", () => {
     const buffer = Buffer.from("ffff0317324c", "hex");
     const result = k1.parsePacket(buffer);
     expect(result).toMatchObject({
-      kind: "start",
+      kind: "progress",
       type: "17",
-      data: Buffer.from("32", "hex").toString(),
+      data: 50,
       checksum: "4c",
       valid: true,
       raw: buffer,
     });
   });
 
-  test("parse end packet", () => {
+  test("parse 100% completed packet", () => {
     const buffer = Buffer.from("ffff0317647e", "hex");
     const result = k1.parsePacket(buffer);
     expect(result).toMatchObject({
-      kind: "end",
+      kind: "completed",
       type: "17",
-      data: Buffer.from("64", "hex").toString(),
+      data: 100,
       checksum: "7e",
       valid: true,
       raw: buffer,

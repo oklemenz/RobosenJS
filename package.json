@@ -11,7 +11,9 @@
     "start": "node scripts/main",
     "control": "node scripts/control",
     "main": "node scripts/main",
+    "prompt": "node scripts/prompt",
     "repl": "node scripts/repl",
+    "voice": "node scripts/voice",
     "lint": "npm run prettier && eslint . --fix",
     "prettier": "prettier \"**/*.{js,json,md,html}\" --write --log-level error"
   },
