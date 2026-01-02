@@ -12,47 +12,58 @@
 
 Terminal:
 
-```shell
-  k1
-```
-
+- `k1`
+- Type `Left Punch`
 - Type `Tab` for completion suggestions
-  - E.g., type: `Left Punch`
 
 ##### Controller
 
 Terminal:
 
-```shell
-  k1 control
-```
-
-or
-
-`npm run control`
-
-Press button `A` for `Left Punch`.
+- `k1 control` or `npm run control`
+- Press button `A` for `Left Punch`
+- Move left stick to control movement
+- Move right stick to control head, body and arms
+  - Use D-Pad to select parts
 
 #### Repl
 
 Terminal:
 
-```shell
-  k1 repl
-```
-
-or
-
-`npm run repl`
-
+- `k1` or `k1 repl` or `npm run repl`
+- Type `Left Punch`
 - Type `Tab` for completion suggestions
-  - E.g., type: `Left Punch`
+
+#### Prompt
+
+Prerequisites:
+
+- Setup `.env` specifying `OPENAI_API_KEY`
+
+Terminal:
+
+- `k1 prompt` or `npm run prompt`
+- Type your command in natural language.
+  - E.g., type: `Make a left punch`
+
+#### Voice
+
+Prerequisites:
+
+- Setup `.env` specifying `OPENAI_API_KEY`
+- Install [dependencies](https://www.npmjs.com/package/node-record-lpcm16#dependencies)
+
+Terminal:
+
+- `k1 voice` or `npm run voice`
+- Speak your command in natural language.
+  - E.g., say: `Make a left punch`
 
 #### Programming
 
 ```js
 const k1 = new Robot("K1");
-await k1.start();
+await k1.on();
 await k1.action("Left Punch");
 await k1.end();
 ```

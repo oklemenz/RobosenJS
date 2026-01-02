@@ -2,8 +2,15 @@
 
 const noble = require("@abandonware/noble");
 const path = require("path");
+const fs = require("fs");
 const repl = require("repl");
 const hid = require("node-hid");
+const OpenAI = require("openai");
+const { Readable } = require("stream");
+const readline = require("readline");
+const recorder = require("node-record-lpcm16");
+
+process.loadEnvFile(".env");
 
 const STATE = {
   INITIAL: 0,
@@ -11,17 +18,28 @@ const STATE = {
   BUSY: 2,
 };
 
+const BODY = {
+  NONE: "none",
+  HEAD: "head",
+  LEFT_ARM: "leftArm",
+  RIGHT_ARM: "rightArm",
+  TORSO: "torso",
+};
+
 module.exports = class Robot {
   constructor(name, options = {}) {
     this.name = name;
-    this.config = require(path.join(__dirname, "robot", name));
-    this.options = options;
-    this.#setup();
+    this.folder = path.join(__dirname, "robot");
+    this.config = {
+      ...require(path.join(this.folder, name)),
+      ...options,
+    };
     this.state = STATE.INITIAL;
+    this.selection = BODY.NONE;
+    this.#setup();
   }
 
   #setup() {
-    this.options.verbose = this.config.verbose ?? false;
     for (const type in this.config.commands) {
       if (type.startsWith("_")) {
         continue;
@@ -37,16 +55,9 @@ module.exports = class Robot {
         command.data = `${type}/${name}`;
       }
     }
-    this.controller = {
-      buttons: {},
-      axes: {
-        values: {},
-        states: {},
-      },
-    };
   }
 
-  async start() {
+  async on() {
     this.log("Waiting for Bluetooth powered on ...");
     await new Promise((resolve) => {
       noble.on("stateChange", (state) => {
@@ -73,14 +84,12 @@ module.exports = class Robot {
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
     this.characteristic = await this.#connect();
-    if (this.config.announcementDelay > 0) {
-      await this.wait(this.config.announcementDelay);
-    }
+    await this.wait(this.config.duration.announcement);
     this.log("Connected to", this.name);
     this.state = STATE.READY;
   }
 
-  async stop(end = false) {
+  async off(end = false) {
     if (this.characteristic) {
       await this.characteristic.unsubscribeAsync();
       this.characteristic = null;
@@ -100,7 +109,7 @@ module.exports = class Robot {
   }
 
   async end() {
-    return this.stop(true);
+    return this.off(true);
   }
 
   async #connect() {
@@ -114,15 +123,24 @@ module.exports = class Robot {
     await characteristic.subscribeAsync();
     characteristic.on("data", (data) => {
       const packet = this.parsePacket(data);
-      this.log(this.config.indent + "Response", packet.toString());
+      this.log(this.config.log.indent + "Response", packet.toString());
     });
     return characteristic;
   }
 
+  ready() {
+    return this.state === STATE.READY;
+  }
+
+  busy() {
+    return this.state === STATE.BUSY;
+  }
+
   commands(type, name) {
-    const allCommands = this.config.commands[type] ?? {};
     const commands = Object.fromEntries(
-      Object.entries(allCommands).filter(([key]) => !key.startsWith("_")),
+      Object.entries(this.config.commands[type] ?? {}).filter(
+        ([key]) => !key.startsWith("_"),
+      ),
     );
     if (name) {
       return commands[name];
@@ -131,27 +149,16 @@ module.exports = class Robot {
   }
 
   actions(name) {
-    return this.commands(this.config.action, name);
-  }
-
-  repl() {
-    const r = repl.start({
-      prompt: `${this.name}> `,
-      useColors: true,
-      ignoreUndefined: true,
-      completer: (line, callback) => {
-        const keys = Object.keys(this.actions());
-        const hits = keys.filter((k) => k.startsWith(line));
-        callback(null, [hits.length ? hits : keys, line]);
-      },
-      eval: async (cmd, context, filename, callback) => {
-        const input = cmd.trim();
-        if (input) {
-          await this.action(input);
-        }
-        callback(null);
-      },
-    });
+    const actions = ["Action", "ProAction"].reduce((result, type) => {
+      return {
+        ...result,
+        ...this.commands(type),
+      };
+    }, {});
+    if (name) {
+      return actions[name];
+    }
+    return actions;
   }
 
   async action(name) {
@@ -162,28 +169,41 @@ module.exports = class Robot {
     }
     this.log(`Performing ${command.data}`);
     const timeout =
-      (command?.duration
-        ? command?.duration + this.config.durationBuffer
+      (command?.duration > 0
+        ? command.duration + (this.config.duration.buffer ?? 0)
         : undefined) ??
       command?.timeout ??
       this.config.commands[command.typeName]._timeout ??
-      this.config.timeout;
+      this.config.duration.timeout;
     await this.perform(async () => {
       return await this.send(command);
     }, timeout);
     this.log(`Finished ${command.data}`);
   }
 
+  async stop() {
+    this.log("Stopping ...");
+    await this.send(this.config.commands.Stop);
+    this.state = STATE.READY;
+  }
+
+  async state() {
+    this.log("Fetching state ...");
+    await this.send(this.config.commands.State);
+    this.state = STATE.READY;
+  }
+
   async perform(callback, timeout) {
-    if (this.state === STATE.BUSY) {
+    if (this.busy()) {
       this.log("Busy ...");
       return;
     }
-    if (this.state !== STATE.READY) {
+    if (!this.ready()) {
       this.log("Not ready!");
       return;
     }
     this.state = STATE.BUSY;
+    await this.wait(this.config.duration.warmup);
     const done = new Promise((resolve) => {
       const handle = setTimeout(() => {
         this.characteristic.off("data", fnData);
@@ -204,7 +224,8 @@ module.exports = class Robot {
     await callback();
     await done;
     const elapsedMs = performance.now() - start;
-    this.log(this.config.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
+    this.log(this.config.log.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
+    await this.wait(this.config.duration.cooldown);
     this.state = STATE.READY;
   }
 
@@ -216,8 +237,9 @@ module.exports = class Robot {
   }
 
   packetCommand(command) {
-    const type = command.type ?? this.config.commands[command.typeName]._id;
-    return this.packet(type, command.data);
+    const type =
+      command.type ?? command._id ?? this.config.commands[command.typeName]._id;
+    return this.packet(type, command.data ?? "");
   }
 
   packetCommandString(command) {
@@ -228,11 +250,23 @@ module.exports = class Robot {
     // | header | numBytes | command | data | checksum |
     const headerBuffer = Buffer.from(this.config.header, "hex");
     const typeBuffer = Buffer.from(type, "hex");
-    const dataBuffer = Buffer.from(data, "utf8");
+    const dataBuffer = Buffer.from(this.encode(data), "utf8");
     const numBytesBuffer = Buffer.from([1 + dataBuffer.length + 1]); // command + data + checksum
     const bodyBuffer = Buffer.concat([numBytesBuffer, typeBuffer, dataBuffer]);
     const checksumBuffer = Buffer.from([this.checksum(bodyBuffer)]);
     return Buffer.concat([headerBuffer, bodyBuffer, checksumBuffer]);
+  }
+
+  encode(data) {
+    if (data === true) {
+      return [1];
+    } else if (data === false) {
+      return [0];
+    }
+    if (typeof data === "number") {
+      return [data];
+    }
+    return data;
   }
 
   packetString(type, data) {
@@ -258,11 +292,14 @@ module.exports = class Robot {
     if (bytes.length === 1) {
       value = parseInt(data, 16);
       kind = value === 100 ? "completed" : "progress";
+    } else if (bytes.length === 0) {
+      kind = "stop";
     }
     const command = {
       kind,
       type,
       data: value,
+      bytes,
       checksum,
       valid: parseInt(checksum, 16) === this.checksum(Buffer.from(body, "hex")),
       raw: buffer,
@@ -282,15 +319,193 @@ module.exports = class Robot {
   }
 
   async wait(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+    if (milliseconds > 0) {
+      return new Promise((resolve) => setTimeout(resolve, milliseconds));
+    }
   }
 
-  prompt() {
-    // TODO: implement
+  selection(part) {
+    this.selection = Object.values(BODY).includes(part) ? part : BODY.NONE;
   }
 
-  voice() {
-    // TODO: implement
+  repl() {
+    repl.start({
+      prompt: `${this.name}> `,
+      useColors: true,
+      ignoreUndefined: true,
+      completer: (line, callback) => {
+        const keys = Object.keys(this.actions());
+        const hits = keys.filter((k) => k.startsWith(line));
+        callback(null, [hits.length ? hits : keys, line]);
+      },
+      eval: async (cmd, context, filename, callback) => {
+        let error = null;
+        try {
+          if (this.busy()) {
+            return await this.stop();
+          }
+          const input = cmd.trim();
+          if (input) {
+            await this.action(input);
+          }
+        } catch (err) {
+          error = err;
+        }
+        callback(error);
+      },
+    });
+  }
+
+  promptRepl() {
+    repl.start({
+      prompt: `${this.name}> `,
+      useColors: true,
+      ignoreUndefined: true,
+      eval: async (cmd, context, filename, callback) => {
+        let error = null;
+        try {
+          const input = cmd.trim();
+          if (input) {
+            await this.prompt(input);
+          }
+        } catch (err) {
+          error = err;
+        }
+        callback(error);
+      },
+    });
+  }
+
+  async voiceRepl() {
+    while (true) {
+      await this.voice();
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+      await new Promise((resolve) => {
+        rl.question(`${this.name}> Press Enter to talk ...`, () => {
+          rl.close();
+          resolve();
+        });
+      });
+    }
+  }
+
+  async prompt(prompt) {
+    const actions = Object.keys(this.actions());
+    const userPrompt = this.llm.userPrompt
+      .replace("{{prompt}}", prompt)
+      .replace(
+        "{{actions}}",
+        actions.map((action) => `- ${action}`).join("\n"),
+      );
+    const response = await this.llm.openai.chat.completions.create({
+      model: this.config.llm.default,
+      temperature: 0,
+      messages: [
+        { role: "system", content: this.llm.systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+    const raw = response.choices[0].message.content;
+    const parsed = JSON.parse(raw);
+    const validatedActions = parsed.actions.filter((a) =>
+      actions.includes(a.name),
+    );
+    this.log(
+      "Performing:",
+      validatedActions.map((action) => action.name).join(", "),
+    );
+    for (const action of validatedActions) {
+      await this.action(action.name);
+    }
+  }
+
+  async voice() {
+    const chunks = [];
+    const recording = recorder.record();
+
+    function calculateRMS(buffer) {
+      let sum = 0;
+      const samples = buffer.length / 2;
+      for (let i = 0; i < buffer.length; i += 2) {
+        const sample = buffer.readInt16LE(i);
+        sum += sample * sample;
+      }
+      return Math.sqrt(sum / samples);
+    }
+
+    await new Promise((resolve) => {
+      let started = false;
+      let stopped = false;
+      let silenceMs = 0;
+      let startTime = Date.now();
+      let lastChunkTime = Date.now();
+
+      recording.stream().on("data", (chunk) => {
+        if (stopped) {
+          return;
+        }
+
+        chunks.push(chunk);
+        const now = Date.now();
+        const chunkMs = now - lastChunkTime;
+        lastChunkTime = now;
+
+        if (!started) {
+          if (now - startTime < this.config.recording.warmup) {
+            return;
+          }
+          started = true;
+          startTime = Date.now();
+          this.log("Listening ...");
+        }
+
+        if (now - startTime >= this.config.recording.maxDuration) {
+          this.log("Processing ...");
+          stopped = true;
+          recording.stop();
+          resolve();
+        }
+        if (
+          this.config.recording.stopOnSilence &&
+          now - startTime >= this.config.recording.minDuration
+        ) {
+          if (calculateRMS(chunk) < this.config.recording.silenceThreshold) {
+            silenceMs += chunkMs;
+            if (silenceMs >= this.config.recording.silenceDuration) {
+              this.log("Silence detected. Processing ...");
+              stopped = true;
+              recording.stop();
+              resolve();
+            }
+          } else {
+            silenceMs = 0;
+          }
+        }
+      });
+    });
+
+    await new Promise((resolve) => {
+      recording.stream().once("close", resolve);
+    });
+
+    const buffer = Buffer.concat(chunks);
+    if (calculateRMS(buffer) < this.config.recording.silenceThreshold) {
+      this.log("No voice detected");
+      return;
+    }
+
+    const stream = Readable.from(buffer);
+    stream.path = "prompt.wav";
+    this.log("Transcribing ...");
+    const transcription = await this.llm.openai.audio.transcriptions.create({
+      file: stream,
+      model: this.config.llm.voice,
+    });
+    this.log("Recognized:", transcription.text);
+    return await this.prompt(transcription.text);
   }
 
   control() {
@@ -319,7 +534,7 @@ module.exports = class Robot {
             states: {},
           },
         };
-        controller.on("data", (data) => {
+        controller.on("data", async (data) => {
           for (const name in config.buttons) {
             const button = config.buttons[name];
             const offset = parseInt(button.index);
@@ -328,7 +543,9 @@ module.exports = class Robot {
             this.controller.buttons[name] = value;
             if (!previous && value) {
               if (button.action) {
-                this.action(button.action);
+                await this.action(button.action);
+              } else if (button.selection) {
+                this.selection(button.selection);
               }
             }
           }
@@ -364,8 +581,24 @@ module.exports = class Robot {
     this.log("No controller found");
   }
 
+  get llm() {
+    return (this._llm ??= {
+      openai: new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      }),
+      systemPrompt: fs.readFileSync(
+        path.join(this.folder, this.config.llm.systemPrompt),
+        "utf-8",
+      ),
+      userPrompt: fs.readFileSync(
+        path.join(this.folder, this.config.llm.userPrompt),
+        "utf-8",
+      ),
+    });
+  }
+
   log(...args) {
-    if (this.options.verbose) {
+    if (this.config.log.verbose) {
       console.log(`< [${new Date().toISOString()}]`, ...args);
     }
   }

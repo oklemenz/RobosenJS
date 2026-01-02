@@ -5,23 +5,70 @@
   "serviceUuid": "ffe0",
   "characteristicsUuid": "ffe1",
   "header": "ffff",
-  "announcementDelay": 3000,
-  "timeout": 5000,
-  "durationBuffer": 500,
-  "action": "ProAction",
-  "verbose": true,
-  "indent": "- ",
+  "duration": {
+    "announcement": 3500,
+    "warmup": 0,
+    "cooldown": 1000,
+    "timeout": 10000,
+    "buffer": 500
+  },
+  "log": {
+    "verbose": true,
+    "indent": "- "
+  },
+  "llm": {
+    "default": "gpt-4.1-mini",
+    "voice": "gpt-4o-mini-transcribe",
+    "systemPrompt": "K1-systemPrompt.txt",
+    "userPrompt": "K1-userPrompt.txt"
+  },
+  "recording": {
+    "warmup": 0,
+    "minDuration": 2000,
+    "maxDuration": 10000,
+    "stopOnSilence": true,
+    "silenceDuration": 1000,
+    "silenceThreshold": 500
+  },
+  "types": {
+    "stop": "0c",
+    "voice": "0d",
+    "states": "0f",
+    "action": "17",
+    "joint": "e8"
+  },
   "commands": {
+    "Stop": {
+      "_id": "0c"
+    },
+    "States": {
+      "_id": "0f"
+    },
+    "Action": {
+      "_id": "17",
+      "Artificial Intelligence": { "duration": 20000 },
+      "Boogaloo": {},
+      "Cyberpunk": {},
+      "Digital Night": {},
+      "Funky Wiggle": {},
+      "Lay Back": {},
+      "Mechanical Beats": {},
+      "Robot Talk": {},
+      "Rocking Soul": {},
+      "Funny": {},
+      "Easy Action": {},
+      "The Squat": {}
+    },
     "ProAction": {
       "_id": "17",
       "Appreciation": { "duration": 5000 },
-      "Back Flip": {},
+      "Back Flip": { "duration": 6500 },
       "Battle State": { "duration": 1700 },
       "Bow, Please": { "duration": 5500 },
       "Crazy": { "duration": 5000 },
-      "Cross Arms": {},
-      "Crouch Down": {},
-      "Do Dog Barks": {},
+      "Cross Arms": { "duration": 2000 },
+      "Crouch Down": { "duration": 7000 },
+      "Do Dog Barks": { "duration": 7000 },
       "Do Exercise": {},
       "Do Squats": {},
       "Fire In The Hole!": {},
@@ -70,6 +117,35 @@
       "Wave Hands": {},
       "Yield": {}
     },
+    "Control": {
+      "Move Forward": {},
+      "Move Backwards": {},
+      "Turn Left": {},
+      "Turn Right": {},
+      "Move Left": {},
+      "Move Right": {},
+      "Initial Position": {}
+    },
+    "Joint": {
+      "_id": "e8",
+      "Head": {},
+      "Left Shoulder": {},
+      "Right Shoulder": {},
+      "Left Arm": {},
+      "Right Arm": {},
+      "Left Hand": {},
+      "Right Hand": {},
+      "Left Hip": {},
+      "Right Hip": {},
+      "Left Thigh": {},
+      "Right Thigh": {},
+      "Left Calf": {},
+      "Right Calf": {},
+      "Left Ankle": {},
+      "Right Ankle": {},
+      "Left Foot": {},
+      "Right Foot": {}
+    },
     "Stage": {
       "Open Arms": {},
       "Spread Legs": {},
@@ -87,25 +163,8 @@
       "Swing Left To Right": {},
       "Push-Ups": {}
     },
-    "Dance": {
-      "Artificial Intelligence": {},
-      "Boogaloo": {},
-      "Cyberpunk": {},
-      "Digital Night": {},
-      "Funky Wiggle": {},
-      "Lay Back": {},
-      "Mechanical Beats": {},
-      "Robot Talk": {},
-      "Rocking Soul": {},
-      "Funny": {},
-      "Easy Action": {},
-      "The Squat": {}
-    },
-    "Other": {
-      "Leg Press": {},
-      "The Splits": {}
-    },
     "Voice": {
+      "_id": "0d",
       "Programming": {},
       "Executing": {},
       "Cancel": {},
@@ -187,34 +246,6 @@
       "Fire In The Hole!": {},
       "Open Legs": { "pro": true },
       "Chest Up": { "pro": true }
-    },
-    "Control": {
-      "Move Forward": {},
-      "Move Backwards": {},
-      "Turn Left": {},
-      "Turn Right": {},
-      "Move Left": {},
-      "Move Right": {},
-      "Initial Position": {}
-    },
-    "Joint": {
-      "Head": {},
-      "Left Shoulder": {},
-      "Right Shoulder": {},
-      "Left Arm": {},
-      "Right Arm": {},
-      "Left Hand": {},
-      "Right Hand": {},
-      "Left Hip": {},
-      "Right Hip": {},
-      "Left Thigh": {},
-      "Right Thigh": {},
-      "Left Calf": {},
-      "Right Calf": {},
-      "Left Ankle": {},
-      "Right Ankle": {},
-      "Left Foot": {},
-      "Right Foot": {}
     }
   },
   "controller": {
@@ -226,30 +257,50 @@
       "usage": 5,
       "deadZone": 0.2,
       "buttons": {
-        "Y": { "index": 3, "value": 1, "action": "Left Punch" },
-        "X": { "index": 3, "value": 2 },
-        "B": { "index": 3, "value": 4 },
-        "A": { "index": 3, "value": 8, "action": "Right Punch" },
-        "R": { "index": 3, "value": 64 },
-        "ZR": { "index": 3, "value": 128 },
-        "Minus": { "index": 4, "value": 1 },
-        "Plus": { "index": 4, "value": 2 },
-        "RightStick": { "index": 4, "value": 4 },
-        "LeftStick": { "index": 4, "value": 8 },
-        "Home": { "index": 4, "value": 16 },
-        "Capture": { "index": 4, "value": 32 },
-        "DPadDown": { "index": 5, "value": 1 },
-        "DPadUp": { "index": 5, "value": 2 },
-        "DPadRight": { "index": 5, "value": 4 },
-        "DPadLeft": { "index": 5, "value": 8 },
-        "L": { "index": 5, "value": 64 },
-        "ZL": { "index": 5, "value": 128 }
+        "Y": { "index": 3, "value": 1, "action": "Handstand" },
+        "X": { "index": 3, "value": 2, "action": "Front Flip" },
+        "B": { "index": 3, "value": 4, "action": "Push Ups" },
+        "A": { "index": 3, "value": 8, "action": "Back Flip" },
+        "R": { "index": 3, "value": 64, "action": "Right Punch" },
+        "ZR": { "index": 3, "value": 128, "action": "Right Kick" },
+        "Minus": { "index": 4, "value": 1, "action": "Take A Seat" },
+        "Plus": { "index": 4, "value": 2, "action": "Twist Butt" },
+        "RightStick": { "index": 4, "value": 4, "action": "Tilt Right" },
+        "LeftStick": { "index": 4, "value": 8, "action": "Tilt Left" },
+        "Home": { "index": 4, "value": 16, "action": "Wave Hands" },
+        "Capture": { "index": 4, "value": 32, "action": "Battle State" },
+        "DPadDown": { "index": 5, "value": 1, "selection": "torso" },
+        "DPadUp": { "index": 5, "value": 2, "selection": "head" },
+        "DPadRight": { "index": 5, "value": 4, "selection": "rightArm" },
+        "DPadLeft": { "index": 5, "value": 8, "selection": "leftArm" },
+        "L": { "index": 5, "value": 64, "action": "Left Punch" },
+        "ZL": { "index": 5, "value": 128, "action": "Left Kick" }
       },
       "axes": {
-        "LeftStickX": { "index": 6, "extend": 4 },
-        "LeftStickY": { "index": 8, "extend": -4 },
-        "RightStickX": { "index": 9, "extend": 4 },
-        "RightStickY": { "index": 11, "extend": -4 }
+        "LeftStickX": {
+          "index": 6,
+          "extend": 4,
+          "control": "move",
+          "direction": "x"
+        },
+        "LeftStickY": {
+          "index": 8,
+          "extend": -4,
+          "control": "move",
+          "direction": "y"
+        },
+        "RightStickX": {
+          "index": 9,
+          "extend": 4,
+          "control": "selection",
+          "direction": "x"
+        },
+        "RightStickY": {
+          "index": 11,
+          "extend": -4,
+          "control": "selection",
+          "direction": "y"
+        }
       }
     }
   }

@@ -11,8 +11,8 @@
     "start": "node scripts/main",
     "control": "node scripts/control",
     "main": "node scripts/main",
-    "prompt": "node scripts/prompt",
     "repl": "node scripts/repl",
+    "prompt": "node scripts/prompt",
     "voice": "node scripts/voice",
     "lint": "npm run prettier && eslint . --fix",
     "prettier": "prettier \"**/*.{js,json,md,html}\" --write --log-level error"
@@ -30,7 +30,9 @@
   },
   "dependencies": {
     "@abandonware/noble": "^1.9.2-26",
-    "node-hid": "^3.2.0"
+    "node-hid": "^3.2.0",
+    "node-record-lpcm16": "^1.0.1",
+    "openai": "^6.15.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
