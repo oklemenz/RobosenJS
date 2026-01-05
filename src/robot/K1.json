@@ -10,81 +10,107 @@
     "warmup": 0,
     "cooldown": 1000,
     "timeout": 10000,
-    "buffer": 500
+    "buffer": 500,
+    "stop": 1000
   },
   "log": {
     "verbose": true,
     "indent": "- "
   },
-  "llm": {
-    "default": "gpt-4.1-mini",
-    "voice": "gpt-4o-mini-transcribe",
-    "systemPrompt": "K1-systemPrompt.txt",
-    "userPrompt": "K1-userPrompt.txt"
-  },
-  "recording": {
-    "warmup": 0,
-    "minDuration": 2000,
-    "maxDuration": 10000,
-    "stopOnSilence": true,
-    "silenceDuration": 1000,
-    "silenceThreshold": 500
-  },
   "types": {
+    "handshake": "0b",
     "stop": "0c",
     "voice": "0d",
-    "states": "0f",
+    "state": "0f",
     "action": "17",
-    "joint": "e8"
+    "joint": "e8",
+    "version": "f7",
+    "date": "f8"
+  },
+  "states": {
+    "pattern": 0,
+    "battery": 1,
+    "volume": 2,
+    "progress": 3,
+    "autoPose": 4,
+    "autoTurn": 5,
+    "charging": 6,
+    "autoOff": 7
+  },
+  "directions": {
+    "moveForward": "Move Forward",
+    "moveBackward": "Move Backward",
+    "turnLeft": "Turn Left",
+    "turnRight": "Turn Right",
+    "moveLeft": "Move Left",
+    "moveRight": "Move Right"
   },
   "commands": {
-    "Stop": {
-      "_id": "0c"
+    "Move": {
+      "Move Forward": { "type": "01", "description": "move north (N)" },
+      "Move Backward": { "type": "05", "description": "move south (S)" },
+      "Turn Left": { "type": "08", "description": "move north west (NW)" },
+      "Turn Right": { "type": "02", "description": "move north east (NE)" },
+      "Move Left": { "type": "07", "description": "move west (W)" },
+      "Move Right": { "type": "03", "description": "move east (E)" }
     },
-    "States": {
-      "_id": "0f"
+    "Handshake": {
+      "type": "0b"
+    },
+    "Stop": {
+      "type": "0c"
+    },
+    "State": {
+      "type": "0f"
+    },
+    "Version": {
+      "type": "f7"
+    },
+    "Date": {
+      "type": "f8"
     },
     "Action": {
-      "_id": "17",
-      "Artificial Intelligence": { "duration": 20000 },
-      "Boogaloo": {},
-      "Cyberpunk": {},
-      "Digital Night": {},
-      "Funky Wiggle": {},
-      "Lay Back": {},
-      "Mechanical Beats": {},
-      "Robot Talk": {},
-      "Rocking Soul": {},
-      "Funny": {},
-      "Easy Action": {},
-      "The Squat": {}
+      "type": "17",
+      "Artificial Intelligence": { "duration": 61000, "description": "music, dance" },
+      "Boogaloo": { "duration": 53000, "description": "music, dance, funny" },
+      "Cyberpunk": { "duration": 58000, "description": "music, dance, fast, wild" },
+      "Digital Night": { "duration": 59000, "description": "music, dance, asian" },
+      "Funky Wiggle": { "duration": 58000, "description": "music, dance, funk" },
+      "Lay Back": { "duration": 64000, "description": "music, dance, relax" },
+      "Mechanical Beats": { "duration": 62000, "description": "music, dance, motion, voice" },
+      "Robot Talk": { "duration": 81000, "description": "music, dance, beat" },
+      "Rocking Soul": { "duration": 56000, "description": "music, dance, drums, rock" },
+      "Funny": { "duration": 9000, "description": "exercise, wild" },
+      "Easy Action": { "duration": 10000, "description": "exercise, splits" },
+      "Quick sneak": { "duration": 14000, "description": "exercise, walk" },
+      "The Squat": { "duration": 19000, "description": "exercise, leg, press" }
     },
     "ProAction": {
-      "_id": "17",
+      "type": "17",
       "Appreciation": { "duration": 5000 },
-      "Back Flip": { "duration": 6500 },
+      "Back Flip": { "duration": 6500, "description": "exercise" },
       "Battle State": { "duration": 1700 },
       "Bow, Please": { "duration": 5500 },
       "Crazy": { "duration": 5000 },
       "Cross Arms": { "duration": 2000 },
       "Crouch Down": { "duration": 7000 },
       "Do Dog Barks": { "duration": 7000 },
-      "Do Exercise": {},
+      "Do Exercise": { "description": "exercise" },
       "Do Squats": {},
       "Fire In The Hole!": {},
-      "Front Flip": {},
-      "Handstand": {},
+      "Front Flip": { "duration": 8600, "description": "exercise" },
+      "Handstand": { "duration": 16000, "description": "exercise" },
       "Kneel,Please": {},
       "Kung Fu": {},
       "Lay Down": {},
-      "Left Kick": { "timeout": 5350 },
+      "Left Kick": { "timeout": 5500 },
       "Left Punch": {},
       "Mountain Running": {},
       "Play Cool": {},
       "Play Dead": {},
       "Pretend To Fart": {},
-      "Push Ups": {},
-      "Right Kick": { "timeout": 5350 },
+      "Push Ups": { "timeout": 10000 },
+      "Right Kick": { "timeout": 5500 },
       "Right Punch": {},
       "Take A Pee": {},
       "Take A Poop": {},
@@ -118,8 +144,9 @@
       "Yield": {}
     },
     "Control": {
+      "type": "??",
       "Move Forward": {},
-      "Move Backwards": {},
+      "Move Backward": {},
       "Turn Left": {},
       "Turn Right": {},
       "Move Left": {},
@@ -127,7 +154,7 @@
       "Initial Position": {}
     },
     "Joint": {
-      "_id": "e8",
+      "type": "e8",
       "Head": {},
       "Left Shoulder": {},
       "Right Shoulder": {},
@@ -147,6 +174,7 @@
       "Right Foot": {}
     },
     "Stage": {
+      "type": "",
       "Open Arms": {},
       "Spread Legs": {},
       "Chinese Bow": {},
@@ -164,7 +192,7 @@
       "Push-Ups": {}
     },
     "Voice": {
-      "_id": "0d",
+      "type": "0d",
       "Programming": {},
       "Executing": {},
       "Cancel": {},
@@ -248,6 +276,26 @@
       "Chest Up": { "pro": true }
     }
   },
+  "llm": {
+    "default": "gpt-4.1-mini",
+    "voice": "gpt-4o-mini-transcribe",
+    "systemPrompt": "K1-systemPrompt.txt",
+    "userPrompt": "K1-userPrompt.txt"
+  },
+  "recording": {
+    "warmup": 0,
+    "minDuration": 2000,
+    "maxDuration": 10000,
+    "stopOnSilence": true,
+    "silenceDuration": 1000,
+    "silenceThreshold": 500,
+    "voice": {
+      "sampleRate": 16000,
+      "frameMs": 20,
+      "rmsThreshold": 300,
+      "minVoicedMs": 100
+    }
+  },
   "controller": {
     "ProController": {
       "vendorId": 1406,
@@ -269,10 +317,10 @@
         "LeftStick": { "index": 4, "value": 8, "action": "Tilt Left" },
         "Home": { "index": 4, "value": 16, "action": "Wave Hands" },
         "Capture": { "index": 4, "value": 32, "action": "Battle State" },
-        "DPadDown": { "index": 5, "value": 1, "selection": "torso" },
-        "DPadUp": { "index": 5, "value": 2, "selection": "head" },
-        "DPadRight": { "index": 5, "value": 4, "selection": "rightArm" },
-        "DPadLeft": { "index": 5, "value": 8, "selection": "leftArm" },
+        "DPadDown": { "index": 5, "value": 1, "body": "Torso" },
+        "DPadUp": { "index": 5, "value": 2, "body": "Head" },
+        "DPadRight": { "index": 5, "value": 4, "body": "Right Arm" },
+        "DPadLeft": { "index": 5, "value": 8, "body": "Left Arm" },
         "L": { "index": 5, "value": 64, "action": "Left Punch" },
         "ZL": { "index": 5, "value": 128, "action": "Left Kick" }
       },
