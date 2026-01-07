@@ -8,7 +8,7 @@
 - Install Project: `npm install`
 - Run Project: `npm start`
 
-##### CLI
+#### CLI
 
 Terminal:
 
@@ -16,7 +16,7 @@ Terminal:
 - Type `Left Punch`
 - Type `Tab` for completion suggestions
 
-##### Controller
+#### Controller
 
 Terminal:
 
