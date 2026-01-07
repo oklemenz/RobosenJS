@@ -11,8 +11,8 @@
     "start": "node scripts/main",
     "control": "node scripts/control",
     "main": "node scripts/main",
-    "repl": "node scripts/repl",
     "prompt": "node scripts/prompt",
+    "repl": "node scripts/repl",
     "voice": "node scripts/voice",
     "lint": "npm run prettier && eslint . --fix",
     "prettier": "prettier \"**/*.{js,json,md,html}\" --write --log-level error"
@@ -38,9 +38,9 @@
     "@eslint/js": "^9.39.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jest": "^29.11.0",
+    "eslint-plugin-jest": "^29.12.1",
     "eslint-plugin-n": "^17.23.1",
-    "globals": "^16.5.0",
+    "globals": "^17.0.0",
     "jest": "^30.2.0",
     "prettier": "^3.7.4"
   },

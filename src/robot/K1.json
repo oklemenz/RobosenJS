@@ -47,12 +47,12 @@
   },
   "commands": {
     "Move": {
-      "Move Forward": { "type": "01", "description": "move north (N)" },
-      "Move Backward": { "type": "05", "description": "move south (S)" },
-      "Turn Left": { "type": "08", "description": "move north west (NW)" },
-      "Turn Right": { "type": "02", "description": "move north east (NE)" },
-      "Move Left": { "type": "07", "description": "move west (W)" },
-      "Move Right": { "type": "03", "description": "move east (E)" }
+      "Move Forward": { "type": "01", "description": "move north (N)", "time": 2000, "min": 500, "max": 10000 },
+      "Move Backward": { "type": "05", "description": "move south (S)", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Left": { "type": "08", "description": "move north west (NW)", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Right": { "type": "02", "description": "move north east (NE)", "time": 2000, "min": 500, "max": 10000 },
+      "Move Left": { "type": "07", "description": "move west (W)", "time": 2000, "min": 500, "max": 10000 },
+      "Move Right": { "type": "03", "description": "move east (E)", "time": 2000, "min": 500, "max": 10000 }
     },
     "Handshake": {
       "type": "0b"
@@ -340,16 +340,38 @@
         "RightStickX": {
           "index": 9,
           "extend": 4,
-          "control": "selection",
+          "control": "moveBody",
           "direction": "x"
         },
         "RightStickY": {
           "index": 11,
           "extend": -4,
-          "control": "selection",
+          "control": "moveBody",
           "direction": "y"
         }
-      }
+      },
+      "move": {
+        "x=0,y=1": "Move Forward",
+        "x=0,y=-1": "Move Backward",
+        "x=-1,y=1": "Turn Left",
+        "x=1,y=1": "Turn Right",
+        "x=-1,y=0": "Move Left",
+        "x=1,y=0": "Move Right",
+        "x=-1,y=-1": "Turn Left",
+        "x=1,y=-1": "Turn Right"
+      },
+      "moveBody": {}
+    }
+  },
+  "keyboard": {
+    "inputDelay": 50,
+    "releaseDelay": 300,
+    "timeout": 500,
+    "keys": {
+      "up": { "move": "Move Forward" },
+      "down": { "move": "Move Backward" },
+      "left": { "move": "Turn Left" },
+      "right": { "move": "Turn Right" }
     }
   }
 }

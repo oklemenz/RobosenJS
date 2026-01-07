@@ -10,13 +10,13 @@ const Robot = require("../src/robot");
   switch (cmd) {
     case "prompt":
     case "llm":
-      await k1.prompt();
-      break;
     case "chatgpt":
-    case "voice":
-      await k1.voice();
+      await k1.promptRepl();
       break;
+    case "voice":
     case "talk":
+      await k1.voiceRepl();
+      break;
     case "control":
       await k1.control();
       break;

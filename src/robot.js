@@ -7,8 +7,9 @@ const repl = require("repl");
 const hid = require("node-hid");
 const OpenAI = require("openai");
 const { Readable } = require("stream");
-const readline = require("readline/promises");
 const recorder = require("node-record-lpcm16");
+const readline = require("readline");
+const readlinePromise = require("readline/promises");
 
 process.loadEnvFile(".env");
 
@@ -88,6 +89,7 @@ module.exports = class Robot {
         command.data ??= `${group}/${name}`;
       }
     }
+    // TODO: create convenience functions: k1.leftPunch()
   }
 
   async on() {
@@ -139,26 +141,29 @@ module.exports = class Robot {
   }
 
   async off(end = false) {
-    if (this.characteristic) {
-      await this.characteristic.unsubscribeAsync();
-      this.characteristic = null;
-    }
-    if (this.peripheral) {
-      await this.peripheral.disconnectAsync();
-      this.peripheral = null;
-    }
-    await noble.stopScanningAsync();
-    noble.removeAllListeners();
-    this.log("Disconnected from", this.name);
-    this.status = STATUS.INITIAL;
-    if (end) {
-      // eslint-disable-next-line
-      process.exit(0);
+    if (this.status !== STATUS.INITIAL) {
+        if (this.characteristic) {
+            await this.characteristic.unsubscribeAsync();
+            this.characteristic = null;
+        }
+        if (this.peripheral) {
+            await this.peripheral.disconnectAsync();
+            this.peripheral = null;
+        }
+        await noble.stopScanningAsync();
+        noble.removeAllListeners();
+        this.log("Disconnected from", this.name);
+        this.status = STATUS.INITIAL;
+        if (end) {
+            // eslint-disable-next-line
+            process.exit(0);
+        }
     }
   }
 
   async end() {
-    return this.off(true);
+    await this.stop();
+    return await this.off(true);
   }
 
   ready() {
@@ -205,7 +210,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Handshake ...");
-    return await this.performBasic(this.config.commands.Handshake);
+    return await this.call(this.config.commands.Handshake);
   }
 
   async version() {
@@ -213,7 +218,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching version ...");
-    return await this.performBasic(this.config.commands.Version);
+    return await this.call(this.config.commands.Version);
   }
 
   async date() {
@@ -221,7 +226,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching date ...");
-    return await this.performBasic(this.config.commands.Date);
+    return await this.call(this.config.commands.Date);
   }
 
   async state() {
@@ -229,7 +234,7 @@ module.exports = class Robot {
       return;
     }
     this.log("Fetching state ...");
-    const statePacket = await this.performBasic(this.config.commands.State);
+    const statePacket = await this.call(this.config.commands.State);
     const state = this.parseState(statePacket.bytes);
     this.log("State:", state);
     return state;
@@ -244,56 +249,63 @@ module.exports = class Robot {
     return result;
   }
 
-  async move(direction, duration = 2000) {
+  async move(direction, time) {
     if (!this.check()) {
       return false;
     }
-    const directionCommand = this.config.commands.Move[direction];
-    if (!directionCommand) {
+    const moveCommand = this.config.commands.Move[direction];
+    if (!moveCommand) {
       this.log("Unknown direction", direction);
       return;
     }
+    if (time !== 0) {
+      time ??= time ?? moveCommand.time;
+      time = Math.min(Math.max(time, moveCommand.min), moveCommand.max);
+    }
     this.log(`${direction} ...`);
-    await Promise.race([
-      this.perform({ command: this.config.commands.Move[direction], timeout: 0 }),
-      this.wait(duration),
-    ]);
-    await this.stop();
+    const move = this.perform({ command: this.config.commands.Move[direction], timeout: 0 });
+    if (time > 0) {
+      await Promise.race([move, this.wait(time)]);
+      await this.stop();
+    }
+    return move;
   }
 
-  async moveForward(duration) {
-    return await this.move(this.config.directions.moveForward, duration);
+  async moveForward(time) {
+    return await this.move(this.config.directions.moveForward, time);
   }
 
-  async moveBackward(duration) {
-    return await this.move(this.config.directions.moveBackward, duration);
+  async moveBackward(time) {
+    return await this.move(this.config.directions.moveBackward, time);
   }
 
-  async turnLeft(duration) {
-    return await this.move(this.config.directions.turnLeft, duration);
+  async turnLeft(time) {
+    return await this.move(this.config.directions.turnLeft, time);
   }
 
-  async turnRight(duration) {
-    return await this.move(this.config.directions.turnRight, duration);
+  async turnRight(time) {
+    return await this.move(this.config.directions.turnRight, time);
   }
 
-  async moveLeft(duration) {
-    return await this.move(this.config.directions.moveLeft, duration);
+  async moveLeft(time) {
+    return await this.move(this.config.directions.moveLeft, time);
   }
 
-  async moveRight(duration) {
-    return await this.move(this.config.directions.moveRight, duration);
+  async moveRight(time) {
+    return await this.move(this.config.directions.moveRight, time);
   }
+
+  async moveBody(direction, time) {}
 
   async stop() {
     if (this.busy() && !this.stopping()) {
       this.status = STATUS.STOP;
       this.log("Stopping ...");
-      await this.performBasic(this.config.commands.Stop, {
+      await this.call(this.config.commands.Stop, {
         type: this.config.types.handshake,
       });
       this.status = STATUS.READY;
-      this.log("Stopped!");
+      this.log("Stopped");
     }
   }
 
@@ -343,15 +355,7 @@ module.exports = class Robot {
     return packet;
   }
 
-  async perform({
-    command,
-    receive = {},
-    timeout = this.config.duration.timeout,
-    check = true,
-    block = true,
-    wait = true,
-    measure = true,
-  }) {
+  async perform({ command, receive = {}, timeout, check = true, block = true, wait = true, measure = true }) {
     if (check && !this.check()) {
       return;
     }
@@ -361,11 +365,12 @@ module.exports = class Robot {
     if (wait) {
       await this.wait(this.config.duration.warmup);
     }
-    receive.type ??= command.type;
-    receive.kind ??= PACKET.DATA;
-    const completed =
-      receive !== PACKET.NONE &&
-      new Promise((resolve) => {
+    let received;
+    if (receive && receive.kind !== PACKET.NONE) {
+      receive.type ??= command.type;
+      receive.kind ??= PACKET.DATA;
+      timeout ??= this.config.duration.timeout;
+      received = new Promise((resolve) => {
         const handle =
           timeout > 0 &&
           setTimeout(() => {
@@ -385,12 +390,21 @@ module.exports = class Robot {
         };
         this.characteristic.on("data", fnData);
       });
+    }
+    let timed;
+    if (!received && command.time > 0) {
+      timed = new Promise((resolve) => {
+        setTimeout(async () => {
+          this.log("Time reached");
+          await this.stop();
+          resolve();
+        }, command.time);
+      });
+    }
     const start = measure && performance.now();
     await this.send(command);
-    let packet;
-    if (receive !== PACKET.NONE) {
-      packet = await completed;
-    }
+    await timed;
+    const packet = await received;
     if (measure) {
       const elapsedMs = performance.now() - start;
       this.log(this.config.log.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
@@ -404,7 +418,7 @@ module.exports = class Robot {
     return packet;
   }
 
-  async performBasic(command, receive, timeout, measure) {
+  async call(command, receive, timeout, measure) {
     return await this.perform({
       command,
       receive,
@@ -432,7 +446,9 @@ module.exports = class Robot {
   }
 
   packetCommand(command) {
-    if (typeof command === "string") {
+    if (Buffer.isBuffer(command)) {
+      return command;
+    } else if (typeof command === "string") {
       return Buffer.from(command, "hex");
     }
     return this.packet(command.type, command.data ?? "");
@@ -583,7 +599,7 @@ module.exports = class Robot {
         process.stdin.pause();
       }
 
-      const rl = readline.createInterface({
+      const rl = readlinePromise.createInterface({
         input: process.stdin,
         output: process.stdout,
       });
@@ -778,9 +794,28 @@ module.exports = class Robot {
     });
   }
 
-  control() {
+  async control() {
+    const trigger = async (source) => {
+      try {
+        if (source.action) {
+          await this.action(source.action);
+        } else if (source.move) {
+          await this.move(source.move, 0);
+        } else if (source.moveBody) {
+          await this.moveBody(source.moveBody, 0);
+        } else if (source.body) {
+          await this.body(source.body);
+        } else if (source.joint) {
+          await this.joint(source.joint);
+        }
+      } catch (err) {
+        this.log(err);
+      }
+    };
+
     const devices = hid.devices();
     let device;
+    let controller;
     const configName = Object.keys(this.config.controller).find((name) => {
       const config = this.config.controller[name];
       device = devices.find(
@@ -788,9 +823,10 @@ module.exports = class Robot {
       );
       return device;
     });
+
     if (device) {
       this.log("Device found", configName);
-      const controller = new hid.HID(device.vendorId, device.productId);
+      controller = new hid.HID(device.vendorId, device.productId);
       if (controller) {
         this.log("Controller connected:", controller.getDeviceInfo().product);
         const config = this.config.controller[configName];
@@ -801,7 +837,7 @@ module.exports = class Robot {
             states: {},
           },
         };
-        controller.on("data", async (data) => {
+        controller.on("data", (data) => {
           for (const name in config.buttons) {
             const button = config.buttons[name];
             const offset = parseInt(button.index);
@@ -809,13 +845,7 @@ module.exports = class Robot {
             const previous = this.controller.buttons[name];
             this.controller.buttons[name] = value;
             if (!previous && value) {
-              if (button.action) {
-                await this.action(button.action);
-              } else if (button.body) {
-                this.body(button.body);
-              } else if (button.joint) {
-                this.joint(button.joint);
-              }
+              trigger(button);
             }
           }
           for (const name in config.axes) {
@@ -837,16 +867,75 @@ module.exports = class Robot {
               value = 0;
             }
             this.controller.axes.values[name] = value;
-            this.controller.axes.states[name] = value === 0 ? 0 : value > 0 ? 1 : -1;
+            value = value === 0 ? 0 : value > 0 ? 1 : -1;
+            const previous = this.controller.axes.states[name];
+            this.controller.axes.states[name] = value;
+            if (!previous && value) {
+              trigger(axis);
+            }
           }
         });
         controller.on("error", (err) => {
           this.log("Controller error", err);
         });
-        return;
       }
     }
-    this.log("No controller found");
+    if (!controller) {
+      this.log("No controller found");
+    }
+
+    readline.emitKeypressEvents(process.stdin);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+
+    const initial = Object.keys(this.config.keyboard.keys).reduce((result, key) => {
+      result[key] = 0;
+      return result;
+    }, {});
+    let releaseTimer = null;
+    this.config.keyboard.states = { ...initial };
+    process.stdin.on("keypress", async (str, key) => {
+      if (key.ctrl && key.name === "c") {
+        await this.end();
+        return;
+      }
+      if (!(key.name in this.config.keyboard.keys)) {
+        return;
+      }
+      this.config.keyboard.states = {
+        ...initial,
+        [key.name]: 1,
+      };
+      clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(() => {
+        this.config.keyboard.states = { ...initial };
+      }, this.config.keyboard.releaseDelay);
+    });
+
+    this.log("Keyboard control active");
+
+    let keyboardStates = this.config.keyboard.states;
+    while (true) {
+      let stop = false;
+      // TODO: aggregate controller states into move => x=0,y=0: stop!
+      for (const name in this.config.keyboard.states) {
+        if (keyboardStates[name] === 1 && this.config.keyboard.states[name] === 0) {
+          await this.stop();
+          stop = true;
+          break;
+        }
+      }
+      if (!stop) {
+        for (const name in this.config.keyboard.states) {
+          if (keyboardStates[name] === 0 && this.config.keyboard.states[name] === 1) {
+            trigger(this.config.keyboard.keys[name]);
+            break;
+          }
+        }
+      }
+      keyboardStates = this.config.keyboard.states;
+      await this.wait(this.config.keyboard.inputDelay);
+    }
   }
 
   async wait(milliseconds) {
