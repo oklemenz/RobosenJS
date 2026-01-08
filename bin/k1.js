@@ -21,6 +21,7 @@ const Robot = require("../src/robot");
       await k1.control();
       break;
     case "repl":
+    case "action":
     default:
       await k1.repl();
       break;

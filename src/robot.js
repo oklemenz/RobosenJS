@@ -58,6 +58,9 @@ const JOINT = {
   RIGHT_FOOT: "Right Foot",
 };
 
+const PROPERTIES = ["type", "timeout"];
+
+/** @type {import('./robot')} */
 module.exports = class Robot {
   constructor(name, options = {}) {
     this.name = name;
@@ -69,16 +72,16 @@ module.exports = class Robot {
     this.status = STATUS.INITIAL;
     this.body = BODY.NONE;
     this.joint = JOINT.NONE;
-    this.setup();
+    this.#setup();
   }
 
-  setup() {
+  #setup() {
     for (const group in this.config.commands) {
-      if (["type"].includes(group)) {
+      if (PROPERTIES.includes(group)) {
         continue;
       }
       for (const name in this.config.commands[group]) {
-        if (["type"].includes(name)) {
+        if (PROPERTIES.includes(name)) {
           continue;
         }
         const command = this.config.commands[group][name];
@@ -89,7 +92,12 @@ module.exports = class Robot {
         command.data ??= `${group}/${name}`;
       }
     }
-    // TODO: create convenience functions: k1.leftPunch()
+    for (const action of Object.values(this.actions())) {
+      const functionName = this.#toCamelCase(action.name);
+      this[functionName] ??= async (...args) => {
+        return await this.action(action.name, ...args);
+      };
+    }
   }
 
   async on() {
@@ -108,30 +116,24 @@ module.exports = class Robot {
     await noble.startScanningAsync([this.config.serviceUuid], false);
     this.peripheral = await new Promise((resolve) => {
       noble.on("discover", async (peripheral) => {
-        if (
-          peripheral.advertisement.localName === this.config.name ||
-          peripheral.advertisement.localName?.includes(this.config.code)
-        ) {
+        if (peripheral.advertisement.localName === this.config.name || peripheral.advertisement.localName?.includes(this.config.code)) {
           resolve(peripheral);
         }
       });
     });
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
-    this.characteristic = await this.connect();
+    this.characteristic = await this.#connect();
     await this.wait(this.config.duration.announcement);
     this.log("Connected to", this.name);
     this.status = STATUS.READY;
   }
 
-  async connect() {
+  async #connect() {
     await this.peripheral.connectAsync();
     const {
       characteristics: [characteristic],
-    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync(
-      [this.config.serviceUuid],
-      [this.config.characteristicsUuid],
-    );
+    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync([this.config.serviceUuid], [this.config.characteristicsUuid]);
     await characteristic.subscribeAsync();
     characteristic.on("data", (data) => {
       const packet = this.parsePacket(data);
@@ -142,22 +144,22 @@ module.exports = class Robot {
 
   async off(end = false) {
     if (this.status !== STATUS.INITIAL) {
-        if (this.characteristic) {
-            await this.characteristic.unsubscribeAsync();
-            this.characteristic = null;
-        }
-        if (this.peripheral) {
-            await this.peripheral.disconnectAsync();
-            this.peripheral = null;
-        }
-        await noble.stopScanningAsync();
-        noble.removeAllListeners();
-        this.log("Disconnected from", this.name);
-        this.status = STATUS.INITIAL;
-        if (end) {
-            // eslint-disable-next-line
-            process.exit(0);
-        }
+      if (this.characteristic) {
+        await this.characteristic.unsubscribeAsync();
+        this.characteristic = null;
+      }
+      if (this.peripheral) {
+        await this.peripheral.disconnectAsync();
+        this.peripheral = null;
+      }
+      await noble.stopScanningAsync();
+      noble.removeAllListeners();
+      this.log("Disconnected from", this.name);
+      this.status = STATUS.INITIAL;
+    }
+    if (end) {
+      // eslint-disable-next-line
+      process.exit(0);
     }
   }
 
@@ -182,7 +184,7 @@ module.exports = class Robot {
     return this.status !== STATUS.INITIAL;
   }
 
-  checkConnected() {
+  #checkConnected() {
     if (!this.connected()) {
       this.log("Not connected!");
       return false;
@@ -190,8 +192,8 @@ module.exports = class Robot {
     return true;
   }
 
-  check() {
-    if (!this.checkConnected()) {
+  #check() {
+    if (!this.#checkConnected()) {
       return false;
     }
     if (this.busy()) {
@@ -206,7 +208,7 @@ module.exports = class Robot {
   }
 
   async handshake() {
-    if (!this.checkConnected()) {
+    if (!this.#checkConnected()) {
       return false;
     }
     this.log("Handshake ...");
@@ -214,7 +216,7 @@ module.exports = class Robot {
   }
 
   async version() {
-    if (!this.checkConnected()) {
+    if (!this.#checkConnected()) {
       return false;
     }
     this.log("Fetching version ...");
@@ -222,7 +224,7 @@ module.exports = class Robot {
   }
 
   async date() {
-    if (!this.checkConnected()) {
+    if (!this.#checkConnected()) {
       return false;
     }
     this.log("Fetching date ...");
@@ -230,7 +232,7 @@ module.exports = class Robot {
   }
 
   async state() {
-    if (!this.checkConnected()) {
+    if (!this.#checkConnected()) {
       return;
     }
     this.log("Fetching state ...");
@@ -240,8 +242,8 @@ module.exports = class Robot {
     return state;
   }
 
-  parseState(hex) {
-    const buffer = Buffer.from(hex, "hex");
+  parseState(state) {
+    const buffer = Buffer.from(state, "hex");
     const result = {};
     for (const [key, index] of Object.entries(this.config.states)) {
       result[key] = buffer[index];
@@ -250,7 +252,7 @@ module.exports = class Robot {
   }
 
   async move(direction, time) {
-    if (!this.check()) {
+    if (!this.#check()) {
       return false;
     }
     const moveCommand = this.config.commands.Move[direction];
@@ -263,10 +265,14 @@ module.exports = class Robot {
       time = Math.min(Math.max(time, moveCommand.min), moveCommand.max);
     }
     this.log(`${direction} ...`);
-    const move = this.perform({ command: this.config.commands.Move[direction], timeout: 0 });
+    const move = this.perform({
+      command: this.config.commands.Move[direction],
+      receive: { kind: moveCommand.receive ?? PACKET.NONE },
+      timeout: 0,
+    });
     if (time > 0) {
       await Promise.race([move, this.wait(time)]);
-      await this.stop();
+      return await this.stop();
     }
     return move;
   }
@@ -297,22 +303,27 @@ module.exports = class Robot {
 
   async moveBody(direction, time) {}
 
+  async moveJoint(direction, time) {}
+
   async stop() {
-    if (this.busy() && !this.stopping()) {
-      this.status = STATUS.STOP;
-      this.log("Stopping ...");
-      await this.call(this.config.commands.Stop, {
-        type: this.config.types.handshake,
-      });
-      this.status = STATUS.READY;
-      this.log("Stopped");
+    if (this.stopping()) {
+      return;
     }
+    if (!this.busy()) {
+      this.log("Not busy ...");
+      return;
+    }
+    this.status = STATUS.STOP;
+    this.log("Stopping ...");
+    await this.call(this.config.commands.Stop, {
+      type: this.config.types.handshake,
+    });
+    this.status = STATUS.READY;
+    this.log("Stopped");
   }
 
   commands(group, name) {
-    const commands = Object.fromEntries(
-      Object.entries(this.config.commands[group] ?? {}).filter(([key]) => !["type"].includes(key)),
-    );
+    const commands = Object.fromEntries(Object.entries(this.config.commands[group] ?? {}).filter(([key]) => !["type"].includes(key)));
     if (name) {
       return commands[name];
     }
@@ -332,14 +343,17 @@ module.exports = class Robot {
     return actions;
   }
 
-  async action(name) {
-    if (!this.check()) {
-      return;
-    }
+  async action(name, limited = false) {
     const action = this.actions(name);
     if (!action) {
       this.log("Unknown action", name);
       return;
+    }
+    if (action.check !== false && !this.#check()) {
+      return;
+    }
+    if (action.call) {
+      return await this[action.call]();
     }
     this.log(`Performing ${action.data} ...`);
     const timeout =
@@ -348,15 +362,18 @@ module.exports = class Robot {
       this.config.duration.timeout;
     const packet = await this.perform({
       command: action,
-      receive: { kind: PACKET.COMPLETED },
+      receive: { kind: action.receive ?? PACKET.COMPLETED },
+      limited,
       timeout,
     });
-    this.log(`Finished ${action.data}`);
+    if (action.receive !== PACKET.NONE) {
+      this.log(`Finished ${action.data}`);
+    }
     return packet;
   }
 
-  async perform({ command, receive = {}, timeout, check = true, block = true, wait = true, measure = true }) {
-    if (check && !this.check()) {
+  async perform({ command, receive = {}, limited = false, check = true, block = true, wait = true, measure = true, timeout }) {
+    if (check && !this.#check()) {
       return;
     }
     if (block) {
@@ -368,8 +385,8 @@ module.exports = class Robot {
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
       receive.type ??= command.type;
-      receive.kind ??= PACKET.DATA;
-      timeout ??= this.config.duration.timeout;
+      receive.kind ??= command.receive ?? PACKET.DATA;
+      timeout ??= command.timeout ?? this.config.duration.timeout;
       received = new Promise((resolve) => {
         const handle =
           timeout > 0 &&
@@ -391,19 +408,21 @@ module.exports = class Robot {
         this.characteristic.on("data", fnData);
       });
     }
-    let timed;
-    if (!received && command.time > 0) {
-      timed = new Promise((resolve) => {
-        setTimeout(async () => {
-          this.log("Time reached");
-          await this.stop();
-          resolve();
-        }, command.time);
-      });
+    let timedLimited;
+    if (!received && limited) {
+      if (command.time > 0) {
+        timedLimited = new Promise((resolve) => {
+          setTimeout(async () => {
+            this.log("Time limit reached");
+            await this.stop();
+            resolve();
+          }, command.time);
+        });
+      }
     }
     const start = measure && performance.now();
     await this.send(command);
-    await timed;
+    await timedLimited;
     const packet = await received;
     if (measure) {
       const elapsedMs = performance.now() - start;
@@ -412,7 +431,7 @@ module.exports = class Robot {
     if (wait) {
       await this.wait(this.config.duration.cooldown);
     }
-    if (block) {
+    if (block && (timedLimited || received)) {
       this.status = STATUS.READY;
     }
     return packet;
@@ -422,11 +441,11 @@ module.exports = class Robot {
     return await this.perform({
       command,
       receive,
-      timeout,
       check: false,
       block: false,
       wait: false,
       measure,
+      timeout,
     });
   }
 
@@ -438,11 +457,15 @@ module.exports = class Robot {
     // | header | numBytes | command | data | checksum |
     const headerBuffer = Buffer.from(this.config.header, "hex");
     const typeBuffer = Buffer.from(type, "hex");
-    const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(this.encode(data), "utf8");
+    const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(this.#encode(data), "utf8");
     const numBytesBuffer = Buffer.from([1 + dataBuffer.length + 1]); // command + data + checksum
     const bodyBuffer = Buffer.concat([numBytesBuffer, typeBuffer, dataBuffer]);
     const checksumBuffer = Buffer.from([this.checksum(bodyBuffer)]);
     return Buffer.concat([headerBuffer, bodyBuffer, checksumBuffer]);
+  }
+
+  packetString(type, data) {
+    return this.packet(type, data).toString("hex");
   }
 
   packetCommand(command) {
@@ -456,10 +479,6 @@ module.exports = class Robot {
 
   packetCommandString(command) {
     return this.packetCommand(command).toString("hex");
-  }
-
-  packetString(type, data) {
-    return this.packet(type, data).toString("hex");
   }
 
   parsePacket(buffer) {
@@ -517,7 +536,7 @@ module.exports = class Robot {
     return buffer.reduce((sum, b) => sum + b, 0) % 256;
   }
 
-  encode(data) {
+  #encode(data) {
     if (data === true) {
       return [1];
     } else if (data === false) {
@@ -550,9 +569,11 @@ module.exports = class Robot {
       eval: async (cmd, context, filename, callback) => {
         let error = null;
         try {
-          await this.stop();
+          if (this.busy()) {
+            await this.stop();
+          }
           const input = cmd.trim();
-          if (input) {
+          if (input && input !== this.config.commands.Move.Stop.name) {
             await this.action(input);
           }
         } catch (err) {
@@ -615,7 +636,7 @@ module.exports = class Robot {
     }
   }
 
-  async voice({ signal }) {
+  async voice({ signal } = {}) {
     const chunks = [];
     const recording = recorder.record();
 
@@ -657,7 +678,7 @@ module.exports = class Robot {
         if (stopped) {
           return;
         }
-        if (signal.aborted) {
+        if (signal?.aborted) {
           return;
         }
 
@@ -701,7 +722,7 @@ module.exports = class Robot {
       recording.stream().once("close", resolve);
     });
 
-    if (signal.aborted) {
+    if (signal?.aborted) {
       return;
     }
 
@@ -720,7 +741,7 @@ module.exports = class Robot {
     });
     this.log("Recognized:", transcription.text);
 
-    if (signal.aborted) {
+    if (signal?.aborted) {
       return;
     }
 
@@ -735,7 +756,9 @@ module.exports = class Robot {
       eval: async (cmd, context, filename, callback) => {
         let error = null;
         try {
-          await this.stop();
+          if (this.busy()) {
+            await this.stop();
+          }
           const input = cmd.trim();
           if (input) {
             await this.prompt(input);
@@ -755,10 +778,7 @@ module.exports = class Robot {
       .replace(
         "{{actions}}",
         actions
-          .map(
-            (action) =>
-              `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`,
-          )
+          .map((action) => `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`)
           .join("\n"),
       );
     const response = await this.llm.openai.chat.completions.create({
@@ -777,7 +797,7 @@ module.exports = class Robot {
     if (selectedActions.length > 0) {
       this.log("Matching actions:", selectedActions.map((action) => action.name).join(", "), "...");
       for (const action of selectedActions) {
-        await this.action(action.name);
+        await this.action(action.name, true);
       }
     } else {
       this.log("No matching actions!");
@@ -794,7 +814,7 @@ module.exports = class Robot {
     });
   }
 
-  async control() {
+  async control({ signal } = {}) {
     const trigger = async (source) => {
       try {
         if (source.action) {
@@ -818,9 +838,7 @@ module.exports = class Robot {
     let controller;
     const configName = Object.keys(this.config.controller).find((name) => {
       const config = this.config.controller[name];
-      device = devices.find(
-        (device) => !!device.product && device.usagePage === config.usagePage && device.usage === config.usage,
-      );
+      device = devices.find((device) => !!device.product && device.usagePage === config.usagePage && device.usage === config.usage);
       return device;
     });
 
@@ -902,6 +920,7 @@ module.exports = class Robot {
       if (!(key.name in this.config.keyboard.keys)) {
         return;
       }
+
       this.config.keyboard.states = {
         ...initial,
         [key.name]: 1,
@@ -916,8 +935,15 @@ module.exports = class Robot {
 
     let keyboardStates = this.config.keyboard.states;
     while (true) {
+      if (signal?.aborted) {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        return;
+      }
       let stop = false;
+
       // TODO: aggregate controller states into move => x=0,y=0: stop!
+
       for (const name in this.config.keyboard.states) {
         if (keyboardStates[name] === 1 && this.config.keyboard.states[name] === 0) {
           await this.stop();
@@ -936,6 +962,16 @@ module.exports = class Robot {
       keyboardStates = this.config.keyboard.states;
       await this.wait(this.config.keyboard.inputDelay);
     }
+  }
+
+  #toCamelCase(name) {
+    return name
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[^a-zA-Z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+      .join("");
   }
 
   async wait(milliseconds) {

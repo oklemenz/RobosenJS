@@ -16,15 +16,19 @@ Terminal:
 - Type `Left Punch`
 - Type `Tab` for completion suggestions
 
-#### Controller
+#### Control
 
 Terminal:
 
 - `k1 control` or `npm run control`
-- Press button `A` for `Left Punch`
-- Move left stick to control movement
-- Move right stick to control head, body and arms
-  - Use D-Pad to select parts
+- **Game Controller:**
+  - Press button `A` for `Left Punch`
+  - Move left stick to control movement
+  - Move right stick to control head, body and arms
+    - Use D-Pad to select parts
+- **Keyboard:**
+  - Arrow keys for movement
+  - `DELETE` / `PAGEDOWN`: Side movement
 
 #### Repl
 
@@ -44,7 +48,7 @@ Terminal:
 
 - `k1 prompt` or `npm run prompt`
 - Type your command in natural language.
-  - E.g., type: `Make a left punch`
+  - E.g., type: `Walk forward and punch left`
 
 #### Voice
 
@@ -57,7 +61,7 @@ Terminal:
 
 - `k1 voice` or `npm run voice`
 - Speak your command in natural language.
-  - E.g., say: `Make a left punch`
+  - E.g., say: `Walk forward and punch left`
 
 #### Programming
 
@@ -65,7 +69,7 @@ Terminal:
 const k1 = new Robot("K1");
 await k1.on();
 await k1.moveForward();
-await k1.action("Left Punch");
+await k1.leftPunch();
 await k1.end();
 ```
 

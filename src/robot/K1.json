@@ -9,7 +9,7 @@
     "announcement": 3500,
     "warmup": 0,
     "cooldown": 1000,
-    "timeout": 10000,
+    "timeout": 5000,
     "buffer": 500,
     "stop": 1000
   },
@@ -47,28 +47,19 @@
   },
   "commands": {
     "Move": {
-      "Move Forward": { "type": "01", "description": "move north (N)", "time": 2000, "min": 500, "max": 10000 },
-      "Move Backward": { "type": "05", "description": "move south (S)", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Left": { "type": "08", "description": "move north west (NW)", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Right": { "type": "02", "description": "move north east (NE)", "time": 2000, "min": 500, "max": 10000 },
-      "Move Left": { "type": "07", "description": "move west (W)", "time": 2000, "min": 500, "max": 10000 },
-      "Move Right": { "type": "03", "description": "move east (E)", "time": 2000, "min": 500, "max": 10000 }
+      "Move Forward": { "type": "01", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Backward": { "type": "05", "description": "move south (S)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Left": { "type": "08", "description": "move north west (NW)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Right": { "type": "02", "description": "move north east (NE)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Left": { "type": "07", "description": "move west (W)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Right": { "type": "03", "description": "move east (E)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Stop": { "call": "stop", "check": false }
     },
-    "Handshake": {
-      "type": "0b"
-    },
-    "Stop": {
-      "type": "0c"
-    },
-    "State": {
-      "type": "0f"
-    },
-    "Version": {
-      "type": "f7"
-    },
-    "Date": {
-      "type": "f8"
-    },
+    "Handshake": { "type": "0b", "timeout": 2000 },
+    "Stop": { "type": "0c", "timeout": 2000 },
+    "State": { "type": "0f" },
+    "Version": { "type": "f7" },
+    "Date": { "type": "f8" },
     "Action": {
       "type": "17",
       "Artificial Intelligence": { "duration": 61000, "description": "music, dance" },
@@ -371,7 +362,11 @@
       "up": { "move": "Move Forward" },
       "down": { "move": "Move Backward" },
       "left": { "move": "Turn Left" },
-      "right": { "move": "Turn Right" }
+      "right": { "move": "Turn Right" },
+      "home": { "move": "Move Forward" },
+      "end": { "move": "Move Backward" },
+      "delete": { "move": "Move Left" },
+      "pagedown": { "move": "Move Right" }
     }
   }
 }
