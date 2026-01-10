@@ -1,12 +1,12 @@
 "use strict";
 
-const Robot = require("../src/robot");
+const { K1 } = require("../");
 
 describe("K1", () => {
   let k1;
 
   beforeEach(() => {
-    k1 = new Robot("K1");
+    k1 = new K1();
   });
 
   test("build packet", () => {

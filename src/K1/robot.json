@@ -1,23 +1,32 @@
 {
   "code": "K1",
   "name": "K1-000Q5",
-  "manufacturerUuid": "15b1",
-  "serviceUuid": "ffe0",
-  "characteristicsUuid": "ffe1",
-  "header": "ffff",
-  "duration": {
+  "spec": {
+    "manufacturerUuid": "15b1",
+    "serviceUuid": "ffe0",
+    "characteristicsUuid": "ffe1",
+    "header": "ffff"
+  },
+  "durations": {
     "announcement": 3500,
     "warmup": 0,
     "cooldown": 1000,
     "timeout": 5000,
     "buffer": 500,
-    "stop": 1000
+    "stop": 1000,
+    "input": 50
   },
   "log": {
     "verbose": true,
     "indent": "- "
   },
   "types": {
+    "moveForward": "01",
+    "turnRight": "02",
+    "moveRight": "03",
+    "moveBackward": "05",
+    "moveLeft": "07",
+    "turnLeft": "08",
     "handshake": "0b",
     "stop": "0c",
     "voice": "0d",
@@ -49,11 +58,11 @@
     "Move": {
       "Move Forward": { "type": "01", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
       "Move Backward": { "type": "05", "description": "move south (S)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Left": { "type": "08", "description": "move north west (NW)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Right": { "type": "02", "description": "move north east (NE)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Left": { "type": "08", "description": "move north/south west (NW/SW)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Right": { "type": "02", "description": "move north/south east (NE/SE)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
       "Move Left": { "type": "07", "description": "move west (W)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
       "Move Right": { "type": "03", "description": "move east (E)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Stop": { "call": "stop", "check": false }
+      "Stop": { "stop": true, "check": false }
     },
     "Handshake": { "type": "0b", "timeout": 2000 },
     "Stop": { "type": "0c", "timeout": 2000 },
@@ -270,8 +279,8 @@
   "llm": {
     "default": "gpt-4.1-mini",
     "voice": "gpt-4o-mini-transcribe",
-    "systemPrompt": "K1-systemPrompt.txt",
-    "userPrompt": "K1-userPrompt.txt"
+    "systemPrompt": "systemPrompt.txt",
+    "userPrompt": "userPrompt.txt"
   },
   "recording": {
     "warmup": 0,
@@ -319,45 +328,46 @@
         "LeftStickX": {
           "index": 6,
           "extend": 4,
-          "control": "move",
+          "stick": "LeftStick",
           "direction": "x"
         },
         "LeftStickY": {
           "index": 8,
           "extend": -4,
-          "control": "move",
+          "stick": "LeftStick",
           "direction": "y"
         },
         "RightStickX": {
           "index": 9,
           "extend": 4,
-          "control": "moveBody",
+          "stick": "RightStick",
           "direction": "x"
         },
         "RightStickY": {
           "index": 11,
           "extend": -4,
-          "control": "moveBody",
+          "stick": "RightStick",
           "direction": "y"
         }
       },
-      "move": {
-        "x=0,y=1": "Move Forward",
-        "x=0,y=-1": "Move Backward",
-        "x=-1,y=1": "Turn Left",
-        "x=1,y=1": "Turn Right",
-        "x=-1,y=0": "Move Left",
-        "x=1,y=0": "Move Right",
-        "x=-1,y=-1": "Turn Left",
-        "x=1,y=-1": "Turn Right"
-      },
-      "moveBody": {}
+      "sticks": {
+        "LeftStick": {
+          "x=0,y=1": { "move": "Move Forward" },
+          "x=0,y=-1": { "move": "Move Backward" },
+          "x=-1,y=1": { "move": "Turn Left" },
+          "x=1,y=1": { "move": "Turn Right" },
+          "x=-1,y=0": { "move": "Move Left" },
+          "x=1,y=0": { "move": "Move Right" },
+          "x=-1,y=-1": { "move": "Turn Left" },
+          "x=1,y=-1": { "move": "Turn Right" },
+          "x=0,y=0": { "stop": true }
+        },
+        "RightStick": {}
+      }
     }
   },
   "keyboard": {
-    "inputDelay": 50,
-    "releaseDelay": 300,
-    "timeout": 500,
+    "release": 300,
     "keys": {
       "up": { "move": "Move Forward" },
       "down": { "move": "Move Backward" },

@@ -2,7 +2,7 @@
   "name": "robosen",
   "version": "1.0.0",
   "description": "Robosen",
-  "main": "src/robot.js",
+  "main": "index.js",
   "bin": {
     "k1": "bin/k1.js"
   },

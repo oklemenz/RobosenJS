@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 "use strict";
 
-const Robot = require("../src/robot");
+const { K1 } = require("../");
 
 (async function main() {
-  const k1 = new Robot("K1");
+  const k1 = new K1();
   await k1.on();
   const cmd = (process.argv.slice(2)?.[0] ?? "").toLowerCase();
   switch (cmd) {
     case "prompt":
+    case "ai":
     case "llm":
     case "chatgpt":
       await k1.promptRepl();
@@ -18,10 +19,13 @@ const Robot = require("../src/robot");
       await k1.voiceRepl();
       break;
     case "control":
+    case "move":
+    case "walk":
       await k1.control();
       break;
     case "repl":
     case "action":
+    case "command":
     default:
       await k1.repl();
       break;

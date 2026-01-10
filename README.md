@@ -7,6 +7,7 @@
 - Install [Node.js](https://nodejs.org/en/download)
 - Install Project: `npm install`
 - Run Project: `npm start`
+- Run Tests: `npm test`
 
 #### CLI
 
@@ -14,21 +15,21 @@ Terminal:
 
 - `k1`
 - Type `Left Punch`
-- Type `Tab` for completion suggestions
+- Press `Tab` for completion suggestions
 
 #### Control
 
 Terminal:
 
 - `k1 control` or `npm run control`
-- **Game Controller:**
-  - Press button `A` for `Left Punch`
+- **Controller:**
+  - Press button `L` for `Left Punch`
   - Move left stick to control movement
-  - Move right stick to control head, body and arms
+  - (wip) Move right stick to control head, body and arms
     - Use D-Pad to select parts
 - **Keyboard:**
-  - Arrow keys for movement
-  - `DELETE` / `PAGEDOWN`: Side movement
+  - Arrow keys to control movement
+  - `delete`/`pagedown` key: Side step left / right
 
 #### Repl
 
@@ -36,26 +37,26 @@ Terminal:
 
 - `k1` or `k1 repl` or `npm run repl`
 - Type `Left Punch`
-- Type `Tab` for completion suggestions
+- Press `Tab` for completion suggestions
 
 #### Prompt
 
 Prerequisites:
 
-- Setup `.env` specifying `OPENAI_API_KEY`
+- Setup [.env](.env) specifying `OPENAI_API_KEY`
 
 Terminal:
 
 - `k1 prompt` or `npm run prompt`
 - Type your command in natural language.
-  - E.g., type: `Walk forward and punch left`
+  - E.g., enter: `Walk forward and punch left`
 
 #### Voice
 
 Prerequisites:
 
-- Setup `.env` specifying `OPENAI_API_KEY`
 - Install [dependencies](https://www.npmjs.com/package/node-record-lpcm16#dependencies)
+- Setup [.env](.env) specifying `OPENAI_API_KEY`
 
 Terminal:
 
@@ -66,7 +67,8 @@ Terminal:
 #### Programming
 
 ```js
-const k1 = new Robot("K1");
+const { K1 } = require("robosen-js"); // not yet published (wip)
+const k1 = new K1();
 await k1.on();
 await k1.moveForward();
 await k1.leftPunch();
@@ -75,4 +77,4 @@ await k1.end();
 
 #### Specification
 
-K1 specification and all commands can be found at [robot/K1.json](src/robot/K1.json).
+K1 specification and all commands can be found at [K1/robot.json](src/K1/robot.json).

@@ -1,15 +1,16 @@
 "use strict";
 
-const noble = require("@abandonware/noble");
-const path = require("path");
 const fs = require("fs");
+const path = require("path");
 const repl = require("repl");
-const hid = require("node-hid");
-const OpenAI = require("openai");
 const { Readable } = require("stream");
-const recorder = require("node-record-lpcm16");
 const readline = require("readline");
 const readlinePromise = require("readline/promises");
+
+const noble = require("@abandonware/noble");
+const hid = require("node-hid");
+const OpenAI = require("openai");
+const recorder = require("node-record-lpcm16");
 
 process.loadEnvFile(".env");
 
@@ -21,12 +22,12 @@ const STATUS = {
 };
 
 const PACKET = {
-  INVALID: "invalid",
   NONE: "none",
   DATA: "data",
   PROGRESS: "progress",
   COMPLETED: "completed",
   STOP: "stop",
+  INVALID: "invalid",
 };
 
 const BODY = {
@@ -62,11 +63,12 @@ const PROPERTIES = ["type", "timeout"];
 
 /** @type {import('./robot')} */
 module.exports = class Robot {
-  constructor(name, options = {}) {
-    this.name = name;
-    this.folder = path.join(__dirname, "robot");
+  constructor(code, options = {}) {
+    this.code = code;
+    this.name = code;
+    this.folder = path.join(__dirname, code);
     this.config = {
-      ...require(path.join(this.folder, name)),
+      ...require(path.join(this.folder, options?.file ?? "robot")),
       ...options,
     };
     this.status = STATUS.INITIAL;
@@ -113,7 +115,7 @@ module.exports = class Robot {
       });
     });
     this.log("Scanning for", this.config.code, "...");
-    await noble.startScanningAsync([this.config.serviceUuid], false);
+    await noble.startScanningAsync([this.config.spec.serviceUuid], false);
     this.peripheral = await new Promise((resolve) => {
       noble.on("discover", async (peripheral) => {
         if (peripheral.advertisement.localName === this.config.name || peripheral.advertisement.localName?.includes(this.config.code)) {
@@ -124,7 +126,7 @@ module.exports = class Robot {
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
     this.characteristic = await this.#connect();
-    await this.wait(this.config.duration.announcement);
+    await this.wait(this.config.durations.announcement);
     this.log("Connected to", this.name);
     this.status = STATUS.READY;
   }
@@ -133,7 +135,7 @@ module.exports = class Robot {
     await this.peripheral.connectAsync();
     const {
       characteristics: [characteristic],
-    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync([this.config.serviceUuid], [this.config.characteristicsUuid]);
+    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync([this.config.spec.serviceUuid], [this.config.spec.characteristicsUuid]);
     await characteristic.subscribeAsync();
     characteristic.on("data", (data) => {
       const packet = this.parsePacket(data);
@@ -306,11 +308,10 @@ module.exports = class Robot {
   async moveJoint(direction, time) {}
 
   async stop() {
-    if (this.stopping()) {
+    if (!this.#checkConnected()) {
       return;
     }
-    if (!this.busy()) {
-      this.log("Not busy ...");
+    if (this.stopping()) {
       return;
     }
     this.status = STATUS.STOP;
@@ -352,14 +353,15 @@ module.exports = class Robot {
     if (action.check !== false && !this.#check()) {
       return;
     }
+    if (action.stop) {
+      return await this.stop();
+    }
     if (action.call) {
       return await this[action.call]();
     }
     this.log(`Performing ${action.data} ...`);
     const timeout =
-      (action?.duration > 0 ? action.duration + (this.config.duration.buffer ?? 0) : undefined) ??
-      action?.timeout ??
-      this.config.duration.timeout;
+      (action?.duration > 0 ? action.duration + (this.config.durations.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.durations.timeout;
     const packet = await this.perform({
       command: action,
       receive: { kind: action.receive ?? PACKET.COMPLETED },
@@ -380,13 +382,13 @@ module.exports = class Robot {
       this.status = STATUS.BUSY;
     }
     if (wait) {
-      await this.wait(this.config.duration.warmup);
+      await this.wait(this.config.durations.warmup);
     }
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
       receive.type ??= command.type;
       receive.kind ??= command.receive ?? PACKET.DATA;
-      timeout ??= command.timeout ?? this.config.duration.timeout;
+      timeout ??= command.timeout ?? this.config.durations.timeout;
       received = new Promise((resolve) => {
         const handle =
           timeout > 0 &&
@@ -429,7 +431,7 @@ module.exports = class Robot {
       this.log(this.config.log.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     }
     if (wait) {
-      await this.wait(this.config.duration.cooldown);
+      await this.wait(this.config.durations.cooldown);
     }
     if (block && (timedLimited || received)) {
       this.status = STATUS.READY;
@@ -438,6 +440,9 @@ module.exports = class Robot {
   }
 
   async call(command, receive, timeout, measure) {
+    if (!this.#checkConnected()) {
+      return;
+    }
     return await this.perform({
       command,
       receive,
@@ -455,7 +460,7 @@ module.exports = class Robot {
 
   packet(type, data) {
     // | header | numBytes | command | data | checksum |
-    const headerBuffer = Buffer.from(this.config.header, "hex");
+    const headerBuffer = Buffer.from(this.config.spec.header, "hex");
     const typeBuffer = Buffer.from(type, "hex");
     const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(this.#encode(data), "utf8");
     const numBytesBuffer = Buffer.from([1 + dataBuffer.length + 1]); // command + data + checksum
@@ -486,7 +491,7 @@ module.exports = class Robot {
       return { kind: PACKET.INVALID, raw: buffer };
     }
     const hex = buffer.toString("hex");
-    if (!hex.startsWith(this.config.header) || hex.length < 10) {
+    if (!hex.startsWith(this.config.spec.header) || hex.length < 10) {
       return { kind: PACKET.INVALID, raw: buffer };
     }
     const numBytes = parseInt(hex.slice(4, 6), 16);
@@ -611,7 +616,7 @@ module.exports = class Robot {
           keyPressed().then(async () => {
             controller.abort();
             await this.stop();
-            await this.wait(this.config.duration.stop);
+            await this.wait(this.config.durations.stop);
           }),
           this.voice({ signal: controller.signal }),
         ]);
@@ -777,9 +782,7 @@ module.exports = class Robot {
       .replace("{{prompt}}", prompt)
       .replace(
         "{{actions}}",
-        actions
-          .map((action) => `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`)
-          .join("\n"),
+        actions.map((action) => `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`).join("\n"),
       );
     const response = await this.llm.openai.chat.completions.create({
       model: this.config.llm.default,
@@ -791,9 +794,7 @@ module.exports = class Robot {
     });
     const responseMessage = response.choices[0].message.content;
     const responseObject = JSON.parse(responseMessage);
-    const selectedActions = responseObject.actions.filter((responseAction) =>
-      actions.find((action) => action.name === responseAction.name),
-    );
+    const selectedActions = responseObject.actions.filter((responseAction) => actions.find((action) => action.name === responseAction.name));
     if (selectedActions.length > 0) {
       this.log("Matching actions:", selectedActions.map((action) => action.name).join(", "), "...");
       for (const action of selectedActions) {
@@ -815,18 +816,24 @@ module.exports = class Robot {
   }
 
   async control({ signal } = {}) {
-    const trigger = async (source) => {
+    const trigger = async (event) => {
       try {
-        if (source.action) {
-          await this.action(source.action);
-        } else if (source.move) {
-          await this.move(source.move, 0);
-        } else if (source.moveBody) {
-          await this.moveBody(source.moveBody, 0);
-        } else if (source.body) {
-          await this.body(source.body);
-        } else if (source.joint) {
-          await this.joint(source.joint);
+        if (this.busy()) {
+          if (event.stop) {
+            await this.stop();
+          }
+        } else {
+          if (event.action) {
+            await this.action(event.action);
+          } else if (event.move) {
+            await this.move(event.move, 0);
+          } else if (event.moveBody) {
+            await this.moveBody(event.moveBody, 0);
+          } else if (event.body) {
+            await this.body(event.body);
+          } else if (event.joint) {
+            await this.joint(event.joint);
+          }
         }
       } catch (err) {
         this.log(err);
@@ -836,9 +843,12 @@ module.exports = class Robot {
     const devices = hid.devices();
     let device;
     let controller;
+    let controllerConfig = {};
     const configName = Object.keys(this.config.controller).find((name) => {
-      const config = this.config.controller[name];
-      device = devices.find((device) => !!device.product && device.usagePage === config.usagePage && device.usage === config.usage);
+      controllerConfig = this.config.controller[name];
+      device =
+        devices.find((device) => device.product === controllerConfig.product || device.product === name) ||
+        devices.find((device) => !!device.product && device.usagePage === controllerConfig.usagePage && device.usage === controllerConfig.usage);
       return device;
     });
 
@@ -928,29 +938,59 @@ module.exports = class Robot {
       clearTimeout(releaseTimer);
       releaseTimer = setTimeout(() => {
         this.config.keyboard.states = { ...initial };
-      }, this.config.keyboard.releaseDelay);
+      }, this.config.keyboard.release);
     });
 
     this.log("Keyboard control active");
 
+    let controllerStates = {
+      current: {},
+      previous: {},
+    };
     let keyboardStates = this.config.keyboard.states;
+
     while (true) {
       if (signal?.aborted) {
         process.stdin.setRawMode(false);
         process.stdin.pause();
         return;
       }
+
+      if (this.controller) {
+        for (const stickName in controllerConfig.sticks) {
+          controllerStates.current[stickName] = { x: 0, y: 0, _: "" };
+        }
+
+        for (const axisName in controllerConfig.axes) {
+          const axis = controllerConfig.axes[axisName];
+          controllerStates.current[axis.stick][axis.direction] = this.controller.axes.states[axisName] || 0;
+          controllerStates.current[axis.stick]._ +=
+            `${controllerStates.current[axis.stick]._ ? "," : ""}${axis.direction}=${controllerStates.current[axis.stick][axis.direction]}`;
+        }
+
+        for (const stickName in controllerConfig.sticks) {
+          const stick = controllerConfig.sticks[stickName];
+          const currentControllerState = controllerStates.current[stickName];
+          const previousControllerState = controllerStates.previous[stickName];
+          if (stick[currentControllerState._] !== stick[previousControllerState?._]) {
+            trigger(stick[currentControllerState._]);
+            break;
+          }
+        }
+        controllerStates.previous = { ...controllerStates.current };
+      }
+
       let stop = false;
-
-      // TODO: aggregate controller states into move => x=0,y=0: stop!
-
-      for (const name in this.config.keyboard.states) {
-        if (keyboardStates[name] === 1 && this.config.keyboard.states[name] === 0) {
-          await this.stop();
-          stop = true;
-          break;
+      if (this.busy()) {
+        for (const name in this.config.keyboard.states) {
+          if (keyboardStates[name] === 1 && this.config.keyboard.states[name] === 0) {
+            await this.stop();
+            stop = true;
+            break;
+          }
         }
       }
+
       if (!stop) {
         for (const name in this.config.keyboard.states) {
           if (keyboardStates[name] === 0 && this.config.keyboard.states[name] === 1) {
@@ -959,8 +999,10 @@ module.exports = class Robot {
           }
         }
       }
+
       keyboardStates = this.config.keyboard.states;
-      await this.wait(this.config.keyboard.inputDelay);
+
+      await this.wait(this.config.durations.input);
     }
   }
 
