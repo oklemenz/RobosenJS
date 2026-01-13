@@ -176,19 +176,19 @@ describe("K1", () => {
       kind: "data",
       type: "0f",
       name: "state",
+      state: {
+        pattern: 0,
+        battery: 32,
+        volume: 130,
+        progress: 0,
+        autoPose: 0,
+        autoTurn: 1,
+        charging: 0,
+        autoOff: 1,
+      },
       checksum: "bd",
       valid: true,
       raw: Buffer.from(text, "hex"),
-    });
-    expect(k1.parseState(responsePacket.bytes)).toEqual({
-      pattern: 0,
-      battery: 32,
-      volume: 130,
-      progress: 0,
-      autoPose: 0,
-      autoTurn: 1,
-      charging: 0,
-      autoOff: 1,
     });
   });
 

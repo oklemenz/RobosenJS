@@ -7,6 +7,10 @@
     "characteristicsUuid": "ffe1",
     "header": "ffff"
   },
+  "log": {
+    "verbose": true,
+    "indent": "- "
+  },
   "duration": {
     "announcement": 3500,
     "warmup": 0,
@@ -16,9 +20,15 @@
     "stop": 1000,
     "input": 50
   },
-  "log": {
-    "verbose": true,
-    "indent": "- "
+  "state": {
+    "pattern": 0,
+    "battery": 1,
+    "volume": 2,
+    "progress": 3,
+    "autoPose": 4,
+    "autoTurn": 5,
+    "charging": 6,
+    "autoOff": 7
   },
   "type": {
     "moveNorth": { "code": "01", "alt": "33", "move": true, "expose": true },
@@ -30,7 +40,7 @@
     "handshake": { "code": "0b" },
     "stop": { "code": "0c", "expose": true },
     "volume": { "code": "0d" },
-    "state": { "code": "0f", "value": "struct" },
+    "state": { "code": "0f", "value": "struct", "expose": true },
     "userNames": { "code": "10", "value": "string", "list": true },
     "actionNames": { "code": "14", "value": "string", "list": true },
     "folderNames": { "code": "16", "value": "string", "list": true },
@@ -44,41 +54,23 @@
     "shiftLeft": { "code": "39", "move": true },
     "shiftRight": { "code": "3A", "move": true },
     "joint": { "code": "e8" },
-    "kind": { "code": "f6", "value": "string" },
-    "version": { "code": "f7", "value": "string" },
-    "date": { "code": "f8", "value": "string" },
+    "kind": { "code": "f6", "value": "string", "expose": true },
+    "version": { "code": "f7", "value": "string", "expose": true },
+    "date": { "code": "f8", "value": "string", "expose": true },
     "shutdown": { "code": "fa", "expose": true },
     "done": { "code": "fa" },
     "failure": { "code": "ff", "value": "string" }
   },
-  "state": {
-    "pattern": 0,
-    "battery": 1,
-    "volume": 2,
-    "progress": 3,
-    "autoPose": 4,
-    "autoTurn": 5,
-    "charging": 6,
-    "autoOff": 7
-  },
-  "direction": {
-    "moveForward": "Move Forward",
-    "moveBackward": "Move Backward",
-    "turnLeft": "Turn Left",
-    "turnRight": "Turn Right",
-    "moveLeft": "Move Left",
-    "moveRight": "Move Right"
-  },
   "command": {
-    "Handshake": { "type": "0b", "timeout": 2000 },
-    "Stop": { "type": "0c", "timeout": 2000 },
-    "Volume": { "type": "0d" },
-    "State": { "type": "0f" },
-    "Kind": { "type": "f6" },
-    "Version": { "type": "f7" },
-    "Date": { "type": "f8" },
-    "Audio": { "type": "19" },
-    "Shutdown": { "type": "fa" },
+    "Handshake": { "type": "0b", "timeout": 2000, "block": false },
+    "Stop": { "type": "0c", "timeout": 2000, "block": false },
+    "Volume": { "type": "0d", "receive": "none", "block": false },
+    "State": { "type": "0f", "receive": "data", "block": false },
+    "Kind": { "type": "f6", "receive": "data", "block": false },
+    "Version": { "type": "f7", "receive": "data", "block": false },
+    "Date": { "type": "f8", "receive": "data", "block": false },
+    "Audio": { "type": "19", "receive": "none", "block": false },
+    "Shutdown": { "type": "fa", "receive": "none", "block": false, "status": 0 },
     "Move": {
       "group": true,
       "Move Forward": { "type": "01", "data": "", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
@@ -266,6 +258,14 @@
       "Open Legs": { "pro": true },
       "Chest Up": { "pro": true }
     }
+  },
+  "direction": {
+    "moveForward": "Move Forward",
+    "moveBackward": "Move Backward",
+    "turnLeft": "Turn Left",
+    "turnRight": "Turn Right",
+    "moveLeft": "Move Left",
+    "moveRight": "Move Right"
   },
   "body": {
     "None": {},

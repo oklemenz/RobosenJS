@@ -197,7 +197,7 @@ module.exports = class Robot {
   }
 
   async stop() {
-    if (!this.#checkConnected() || !this.busy() || this.stopping()) {
+    if (!this.connected() || !this.busy() || this.stopping()) {
       return;
     }
     this.status = STATUS.STOP;
@@ -223,7 +223,7 @@ module.exports = class Robot {
     }
     this.log("Fetching kind ...");
     const packet = await this.call(this.config.command.Kind);
-    return packet.data;
+    return packet?.data;
   }
 
   async version() {
@@ -232,7 +232,7 @@ module.exports = class Robot {
     }
     this.log("Fetching version ...");
     const packet = await this.call(this.config.command.Version);
-    return packet.data;
+    return packet?.data;
   }
 
   async date() {
@@ -241,7 +241,7 @@ module.exports = class Robot {
     }
     this.log("Fetching date ...");
     const packet = await this.call(this.config.command.Date);
-    return packet.data;
+    return packet?.data;
   }
 
   async state() {
@@ -249,21 +249,8 @@ module.exports = class Robot {
       return;
     }
     this.log("Fetching state ...");
-    const statePacket = await this.call(this.config.command.State);
-    if (statePacket) {
-      const state = this.parseState(statePacket.bytes);
-      this.log("State:", state);
-      return state;
-    }
-  }
-
-  parseState(state) {
-    const buffer = Buffer.from(state, "hex");
-    const result = {};
-    for (const [key, index] of Object.entries(this.config.state)) {
-      result[key] = buffer[index];
-    }
-    return result;
+    const packet = await this.call(this.config.command.State);
+    return packet?.state;
   }
 
   async list(type) {
@@ -286,7 +273,7 @@ module.exports = class Robot {
     };
     await this.call({ type }, receive);
     return receive.result.map((packet) => {
-      return packet.data;
+      return packet?.data;
     });
   }
 
@@ -435,7 +422,9 @@ module.exports = class Robot {
     if (action.call) {
       return await this[action.call]();
     }
-    this.log(`Performing ${action.data ?? ""} ...`);
+    if (action.data) {
+      this.log(`Performing ${action.data} ...`);
+    }
     const timeout =
       (action?.duration > 0 ? action.duration + (this.config.duration.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration.timeout;
     const packet = await this.perform({
@@ -444,7 +433,7 @@ module.exports = class Robot {
       limited,
       timeout,
     });
-    if (action.receive !== PACKET.NONE) {
+    if (action.receive !== PACKET.NONE && action.data) {
       this.log(`Finished ${action.data}`);
     }
     return packet;
@@ -454,11 +443,12 @@ module.exports = class Robot {
     if (check && !this.#check()) {
       return;
     }
+    block = block && command.block !== false;
     if (block) {
       this.status = STATUS.BUSY;
-    }
-    if (wait) {
-      await this.wait(this.config.duration.warmup);
+      if (wait) {
+        await this.wait(this.config.duration.warmup);
+      }
     }
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
@@ -511,9 +501,12 @@ module.exports = class Robot {
     }
     if (wait) {
       await this.wait(this.config.duration.cooldown);
+      if (block && command.block !== false && (timedLimited || received)) {
+        this.status = STATUS.READY;
+      }
     }
-    if (block && (timedLimited || received)) {
-      this.status = STATUS.READY;
+    if (command.status !== undefined && command.status !== null) {
+      this.status = command.status;
     }
     return packet;
   }
@@ -593,11 +586,13 @@ module.exports = class Robot {
       kind = PACKET.STOP;
     }
     const name = typeConfig?.name ?? "";
+    const state = type === this.config.type.state.code ? this.#parseState(data) : undefined;
     return {
       kind,
       type,
       name,
       data: value,
+      state,
       bytes,
       checksum,
       valid: parseInt(checksum, 16) === this.checksum(Buffer.from(body, "hex")),
@@ -606,9 +601,18 @@ module.exports = class Robot {
         return hex;
       },
       toLogString: () => {
-        return `<packet kind=${kind} type=${type} (${name}) data=${value || bytes.toString("hex")}>`;
+        return `<packet kind=${kind} type=${type} (${name}) data=${JSON.stringify(state) || value || bytes.toString("hex")}>`;
       },
     };
+  }
+
+  #parseState(state) {
+    const buffer = Buffer.from(state, "hex");
+    const result = {};
+    for (const [key, index] of Object.entries(this.config.state)) {
+      result[key] = buffer[index];
+    }
+    return result;
   }
 
   parsePacketString(string) {

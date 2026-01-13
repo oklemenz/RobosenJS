@@ -77,6 +77,7 @@ interface Packet {
     type: PacketType;
     name?: string;
     data?: string | number;
+    state?: State;
     bytes?: Buffer;
     checksum?: string;
     valid?: boolean;
@@ -150,8 +151,6 @@ export class Robot {
     date(): Promise<string>;
 
     state(): Promise<State>;
-
-    parseState(state: string): State;
 
     list(type: PacketType): Promise<string[]>;
 
