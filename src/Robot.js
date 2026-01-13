@@ -7,10 +7,10 @@ const { Readable } = require("stream");
 const readline = require("readline");
 const readlinePromise = require("readline/promises");
 
-const noble = require("@abandonware/noble");
 const hid = require("node-hid");
-const OpenAI = require("openai");
+const noble = require("@abandonware/noble");
 const recorder = require("node-record-lpcm16");
+const OpenAI = require("openai");
 
 process.loadEnvFile(".env");
 
@@ -30,37 +30,6 @@ const PACKET = {
   INVALID: "invalid",
 };
 
-const BODY = {
-  NONE: "None",
-  HEAD: "Head",
-  LEFT_ARM: "Left Arm",
-  RIGHT_ARM: "Right Arm",
-  TORSO: "Torso",
-};
-
-const JOINT = {
-  NONE: "None",
-  HEAD: "Head",
-  LEFT_SHOULDER: "Left Shoulder",
-  RIGHT_SHOULDER: "Right Shoulder",
-  LEFT_ARM: "Left Arm",
-  RIGHT_ARM: "Right Arm",
-  LEFT_HAND: "Left Hand",
-  RIGHT_HAND: "Right Hand",
-  LEFT_HIP: "Left Hip",
-  RIGHT_HIP: "Right Hip",
-  LEFT_THIGH: "Left Thigh",
-  RIGHT_THIGH: "Right Thigh",
-  LEFT_CALF: "Left Calf",
-  RIGHT_CALF: "Right Calf",
-  LEFT_ANKLE: "Left Ankle",
-  RIGHT_ANKLE: "Right Ankle",
-  LEFT_FOOT: "Left Foot",
-  RIGHT_FOOT: "Right Foot",
-};
-
-const PROPERTIES = ["type", "timeout"];
-
 /** @type {import('./robot')} */
 module.exports = class Robot {
   constructor(code, options = {}) {
@@ -72,23 +41,24 @@ module.exports = class Robot {
       ...options,
     };
     this.status = STATUS.INITIAL;
-    this.body = BODY.NONE;
-    this.joint = JOINT.NONE;
+    this.body = this.config.body.None;
+    this.joint = this.config.joint.None;
     this.#setup();
   }
 
   #setup() {
-    for (const group in this.config.commands) {
-      if (PROPERTIES.includes(group)) {
+    ["type", "command", "body", "joint"].forEach((section) => this.#propagate(section));
+    for (const group in this.config.command) {
+      if (!this.config.command[group].group) {
         continue;
       }
-      for (const name in this.config.commands[group]) {
-        if (PROPERTIES.includes(name)) {
+      for (const name in this.config.command[group]) {
+        const command = this.config.command[group][name];
+        if (!this.#isObject(command)) {
           continue;
         }
-        const command = this.config.commands[group][name];
         command.kind ??= PACKET.DATA;
-        command.type ??= this.config.commands[group].type;
+        command.type ??= this.config.command[group].type;
         command.name ??= name;
         command.group ??= group;
         command.data ??= `${group}/${name}`;
@@ -99,6 +69,15 @@ module.exports = class Robot {
       this[functionName] ??= async (...args) => {
         return await this.action(action.name, ...args);
       };
+    }
+  }
+
+  #propagate(section) {
+    for (const name in this.config[section]) {
+      const entry = this.config[section][name];
+      if (this.#isObject(entry)) {
+        entry.name ??= name;
+      }
     }
   }
 
@@ -126,7 +105,7 @@ module.exports = class Robot {
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
     this.characteristic = await this.#connect();
-    await this.wait(this.config.durations.announcement);
+    await this.wait(this.config.duration.announcement);
     this.log("Connected to", this.name);
     this.status = STATUS.READY;
   }
@@ -214,7 +193,37 @@ module.exports = class Robot {
       return false;
     }
     this.log("Handshake ...");
-    return await this.call(this.config.commands.Handshake);
+    await this.call(this.config.command.Handshake);
+  }
+
+  async stop() {
+    if (!this.#checkConnected() || !this.busy() || this.stopping()) {
+      return;
+    }
+    this.status = STATUS.STOP;
+    this.log("Stopping ...");
+    await this.call(this.config.command.Stop, {
+      type: this.config.type.handshake.code,
+    });
+    this.status = STATUS.READY;
+    this.log("Stopped");
+  }
+
+  async shutdown() {
+    if (!this.#checkConnected()) {
+      return false;
+    }
+    this.log("Shutdown ...");
+    await this.call(this.config.command.Shutdown);
+  }
+
+  async kind() {
+    if (!this.#checkConnected()) {
+      return false;
+    }
+    this.log("Fetching kind ...");
+    const packet = await this.call(this.config.command.Kind);
+    return packet.data;
   }
 
   async version() {
@@ -222,7 +231,8 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching version ...");
-    return await this.call(this.config.commands.Version);
+    const packet = await this.call(this.config.command.Version);
+    return packet.data;
   }
 
   async date() {
@@ -230,7 +240,8 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching date ...");
-    return await this.call(this.config.commands.Date);
+    const packet = await this.call(this.config.command.Date);
+    return packet.data;
   }
 
   async state() {
@@ -238,26 +249,92 @@ module.exports = class Robot {
       return;
     }
     this.log("Fetching state ...");
-    const statePacket = await this.call(this.config.commands.State);
-    const state = this.parseState(statePacket.bytes);
-    this.log("State:", state);
-    return state;
+    const statePacket = await this.call(this.config.command.State);
+    if (statePacket) {
+      const state = this.parseState(statePacket.bytes);
+      this.log("State:", state);
+      return state;
+    }
   }
 
   parseState(state) {
     const buffer = Buffer.from(state, "hex");
     const result = {};
-    for (const [key, index] of Object.entries(this.config.states)) {
+    for (const [key, index] of Object.entries(this.config.state)) {
       result[key] = buffer[index];
     }
     return result;
+  }
+
+  async list(type) {
+    if (!this.#checkConnected()) {
+      return;
+    }
+    type = type?.code ?? type;
+    const typeConfig = this.#typeConfig(type);
+    if (!typeConfig) {
+      this.log("Unknown type", type);
+    }
+    if (!typeConfig.list) {
+      this.log("Not a list type", type);
+    }
+    this.log("Listing", typeConfig.name, "...");
+    const receive = {
+      type: this.config.type.done.code,
+      collect: type,
+      result: [],
+    };
+    await this.call({ type }, receive);
+    return receive.result.map((packet) => {
+      return packet.data;
+    });
+  }
+
+  async actionNames() {
+    return await this.list(this.config.type.actionNames);
+  }
+
+  async listUserNames() {
+    return await this.list(this.config.type.userNames);
+  }
+
+  async listFolderNames() {
+    return await this.list(this.config.type.folderNames);
+  }
+
+  async listAudioNames() {
+    return await this.list(this.config.type.audioNames);
+  }
+
+  async volume(level) {
+    if (!this.#checkConnected()) {
+      return false;
+    }
+    this.log("Setting volume ...");
+    level = Math.min(Math.max(level, 0), 140);
+    await this.call({
+      ...this.config.command.Volume,
+      level,
+    });
+  }
+
+  async audio(name) {
+    if (!this.#checkConnected()) {
+      return false;
+    }
+    this.log("Playing audio ...");
+    await this.call({
+      ...this.config.command.Audio,
+      data: name,
+    });
   }
 
   async move(direction, time) {
     if (!this.#check()) {
       return false;
     }
-    const moveCommand = this.config.commands.Move[direction];
+    direction = direction?.type ?? direction;
+    const moveCommand = this.config.command.Move[direction];
     if (!moveCommand) {
       this.log("Unknown direction", direction);
       return;
@@ -268,7 +345,7 @@ module.exports = class Robot {
     }
     this.log(`${direction} ...`);
     const move = this.perform({
-      command: this.config.commands.Move[direction],
+      command: this.config.command.Move[direction],
       receive: { kind: moveCommand.receive ?? PACKET.NONE },
       timeout: 0,
     });
@@ -280,51 +357,40 @@ module.exports = class Robot {
   }
 
   async moveForward(time) {
-    return await this.move(this.config.directions.moveForward, time);
+    return await this.move(this.config.direction.moveForward, time);
   }
 
   async moveBackward(time) {
-    return await this.move(this.config.directions.moveBackward, time);
+    return await this.move(this.config.direction.moveBackward, time);
   }
 
   async turnLeft(time) {
-    return await this.move(this.config.directions.turnLeft, time);
+    return await this.move(this.config.direction.turnLeft, time);
   }
 
   async turnRight(time) {
-    return await this.move(this.config.directions.turnRight, time);
+    return await this.move(this.config.direction.turnRight, time);
   }
 
   async moveLeft(time) {
-    return await this.move(this.config.directions.moveLeft, time);
+    return await this.move(this.config.direction.moveLeft, time);
   }
 
   async moveRight(time) {
-    return await this.move(this.config.directions.moveRight, time);
+    return await this.move(this.config.direction.moveRight, time);
   }
 
   async moveBody(direction, time) {}
 
   async moveJoint(direction, time) {}
 
-  async stop() {
-    if (!this.#checkConnected()) {
-      return;
-    }
-    if (this.stopping()) {
-      return;
-    }
-    this.status = STATUS.STOP;
-    this.log("Stopping ...");
-    await this.call(this.config.commands.Stop, {
-      type: this.config.types.handshake,
-    });
-    this.status = STATUS.READY;
-    this.log("Stopped");
-  }
-
   commands(group, name) {
-    const commands = Object.fromEntries(Object.entries(this.config.commands[group] ?? {}).filter(([key]) => !["type"].includes(key)));
+    const commands = Object.fromEntries(
+      Object.entries(this.config.command[group] ?? {}).filter(([name]) => {
+        const command = this.config.command[group][name];
+        return this.#isObject(command) && this.#typeConfig(command.type)?.expose;
+      }),
+    );
     if (name) {
       return commands[name];
     }
@@ -332,11 +398,21 @@ module.exports = class Robot {
   }
 
   actions(name) {
-    const actions = ["Action", "ProAction", "Move"].reduce((result, group) => {
-      return {
-        ...result,
-        ...this.commands(group),
-      };
+    const actions = Object.keys(this.config.command).reduce((result, group) => {
+      const command = this.config.command[group];
+      if (this.#isObject(command)) {
+        if (command.group) {
+          result = {
+            ...result,
+            ...this.commands(group),
+          };
+        } else if (!command.group) {
+          if (this.#typeConfig(command.type)?.expose) {
+            result[group] = command;
+          }
+        }
+      }
+      return result;
     }, {});
     if (name) {
       return actions[name];
@@ -359,9 +435,9 @@ module.exports = class Robot {
     if (action.call) {
       return await this[action.call]();
     }
-    this.log(`Performing ${action.data} ...`);
+    this.log(`Performing ${action.data ?? ""} ...`);
     const timeout =
-      (action?.duration > 0 ? action.duration + (this.config.durations.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.durations.timeout;
+      (action?.duration > 0 ? action.duration + (this.config.duration.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration.timeout;
     const packet = await this.perform({
       command: action,
       receive: { kind: action.receive ?? PACKET.COMPLETED },
@@ -382,13 +458,13 @@ module.exports = class Robot {
       this.status = STATUS.BUSY;
     }
     if (wait) {
-      await this.wait(this.config.durations.warmup);
+      await this.wait(this.config.duration.warmup);
     }
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
       receive.type ??= command.type;
       receive.kind ??= command.receive ?? PACKET.DATA;
-      timeout ??= command.timeout ?? this.config.durations.timeout;
+      timeout ??= command.timeout ?? this.config.duration.timeout;
       received = new Promise((resolve) => {
         const handle =
           timeout > 0 &&
@@ -399,6 +475,9 @@ module.exports = class Robot {
           }, timeout);
         const fnData = (data) => {
           const packet = this.parsePacket(data);
+          if (packet.type === receive.collect) {
+            receive.result.push(packet);
+          }
           if (packet.kind === receive.kind && packet.type === receive.type) {
             if (handle) {
               clearTimeout(handle);
@@ -431,7 +510,7 @@ module.exports = class Robot {
       this.log(this.config.log.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     }
     if (wait) {
-      await this.wait(this.config.durations.cooldown);
+      await this.wait(this.config.duration.cooldown);
     }
     if (block && (timedLimited || received)) {
       this.status = STATUS.READY;
@@ -439,7 +518,7 @@ module.exports = class Robot {
     return packet;
   }
 
-  async call(command, receive, timeout, measure) {
+  async call(command, receive, measure, timeout) {
     if (!this.#checkConnected()) {
       return;
     }
@@ -461,7 +540,7 @@ module.exports = class Robot {
   packet(type, data) {
     // | header | numBytes | command | data | checksum |
     const headerBuffer = Buffer.from(this.config.spec.header, "hex");
-    const typeBuffer = Buffer.from(type, "hex");
+    const typeBuffer = Buffer.from(type.code ?? type, "hex");
     const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(this.#encode(data), "utf8");
     const numBytesBuffer = Buffer.from([1 + dataBuffer.length + 1]); // command + data + checksum
     const bodyBuffer = Buffer.concat([numBytesBuffer, typeBuffer, dataBuffer]);
@@ -502,23 +581,22 @@ module.exports = class Robot {
     let kind = PACKET.DATA;
     const bytes = Buffer.from(data, "hex");
     let value = "";
+    const typeConfig = this.#typeConfig(type);
     if (bytes.length === 1) {
       value = parseInt(data, 16);
+    } else if (typeConfig?.value === "string") {
+      value = bytes.toString();
     }
-    if ([this.config.types.action, this.config.types.version, this.config.types.date].includes(type)) {
-      if (bytes.length === 1) {
-        kind = value === 100 ? PACKET.COMPLETED : PACKET.PROGRESS;
-      } else if (bytes.length === 0) {
-        kind = PACKET.STOP;
-      } else {
-        value = bytes.toString();
-      }
+    if (typeConfig?.progress && bytes.length === 1) {
+      kind = value === 100 ? PACKET.COMPLETED : PACKET.PROGRESS;
+    } else if (typeConfig?.code === this.config.type.stop.code && bytes.length === 0) {
+      kind = PACKET.STOP;
     }
-    const code = Object.keys(this.config.types).find((t) => this.config.types[t] === type) || "";
+    const name = typeConfig?.name ?? "";
     return {
       kind,
       type,
-      code,
+      name,
       data: value,
       bytes,
       checksum,
@@ -528,13 +606,13 @@ module.exports = class Robot {
         return hex;
       },
       toLogString: () => {
-        return `<packet kind=${kind} type=${type} (${code}) data=${value || bytes.toString("hex")}>`;
+        return `<packet kind=${kind} type=${type} (${name}) data=${value || bytes.toString("hex")}>`;
       },
     };
   }
 
-  parsePacketString(text) {
-    return this.parsePacket(Buffer.from(text, "hex"));
+  parsePacketString(string) {
+    return this.parsePacket(Buffer.from(string, "hex"));
   }
 
   checksum(buffer) {
@@ -553,12 +631,12 @@ module.exports = class Robot {
     return data;
   }
 
-  body(body) {
-    this.body = Object.values(BODY).includes(body) ? body : BODY.NONE;
+  selectBody(body) {
+    this.body = this.config.body[body] ?? this.config.body.None;
   }
 
-  joint(joint) {
-    this.joint = Object.values(JOINT).includes(joint) ? joint : JOINT.NONE;
+  selectJoint(joint) {
+    this.joint = this.config.joint[joint] ?? this.config.joint.None;
   }
 
   repl() {
@@ -574,11 +652,9 @@ module.exports = class Robot {
       eval: async (cmd, context, filename, callback) => {
         let error = null;
         try {
-          if (this.busy()) {
-            await this.stop();
-          }
+          await this.stop();
           const input = cmd.trim();
-          if (input && input !== this.config.commands.Move.Stop.name) {
+          if (input && input !== this.config.command.Move.Stop.name) {
             await this.action(input);
           }
         } catch (err) {
@@ -587,58 +663,6 @@ module.exports = class Robot {
         callback(error);
       },
     });
-  }
-
-  async voiceRepl() {
-    const keyPressed = () =>
-      new Promise((resolve) => {
-        const onData = (data) => {
-          cleanup();
-          resolve(data.toString());
-        };
-
-        const cleanup = () => {
-          process.stdin.setRawMode(false);
-          process.stdin.pause();
-          process.stdin.removeListener("data", onData);
-        };
-
-        process.stdin.setRawMode(true);
-        process.stdin.resume();
-        process.stdin.once("data", onData);
-      });
-
-    while (true) {
-      const controller = new AbortController();
-
-      try {
-        await Promise.race([
-          keyPressed().then(async () => {
-            controller.abort();
-            await this.stop();
-            await this.wait(this.config.durations.stop);
-          }),
-          this.voice({ signal: controller.signal }),
-        ]);
-      } finally {
-        process.stdin.setRawMode(false);
-        process.stdin.pause();
-      }
-
-      const rl = readlinePromise.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
-
-      try {
-        await rl.question(`${this.name}> Press Enter to talk ...`);
-      } catch {
-        // Ctrl+C
-        return;
-      } finally {
-        rl.close();
-      }
-    }
   }
 
   async voice({ signal } = {}) {
@@ -740,7 +764,7 @@ module.exports = class Robot {
     const stream = Readable.from(buffer);
     stream.path = "prompt.wav";
     this.log("Transcribing ...");
-    const transcription = await this.llm.openai.audio.transcriptions.create({
+    const transcription = await this.#llm().openai.audio.transcriptions.create({
       file: stream,
       model: this.config.llm.voice,
     });
@@ -753,42 +777,72 @@ module.exports = class Robot {
     return await this.prompt(transcription.text);
   }
 
-  promptRepl() {
-    repl.start({
-      prompt: `${this.name}> `,
-      useColors: true,
-      ignoreUndefined: true,
-      eval: async (cmd, context, filename, callback) => {
-        let error = null;
-        try {
-          if (this.busy()) {
+  async voiceRepl() {
+    const keyPressed = () =>
+      new Promise((resolve) => {
+        const onData = (data) => {
+          cleanup();
+          resolve(data.toString());
+        };
+
+        const cleanup = () => {
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.stdin.removeListener("data", onData);
+        };
+
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
+        process.stdin.once("data", onData);
+      });
+
+    while (true) {
+      const controller = new AbortController();
+
+      try {
+        await Promise.race([
+          keyPressed().then(async () => {
+            controller.abort();
             await this.stop();
-          }
-          const input = cmd.trim();
-          if (input) {
-            await this.prompt(input);
-          }
-        } catch (err) {
-          error = err;
-        }
-        callback(error);
-      },
-    });
+            await this.wait(this.config.duration.stop);
+          }),
+          this.voice({ signal: controller.signal }),
+        ]);
+      } finally {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+      }
+
+      const rl = readlinePromise.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      try {
+        await rl.question(`${this.name}> Press Enter to talk ...`);
+      } catch {
+        // Ctrl+C
+        return;
+      } finally {
+        rl.close();
+      }
+    }
   }
 
   async prompt(prompt) {
+    const llm = this.#llm();
     const actions = Object.values(this.actions());
-    const userPrompt = this.llm.userPrompt
+    const userPrompt = llm.userPrompt
       .replace("{{prompt}}", prompt)
       .replace(
         "{{actions}}",
         actions.map((action) => `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`).join("\n"),
       );
-    const response = await this.llm.openai.chat.completions.create({
+    const response = await llm.openai.chat.completions.create({
       model: this.config.llm.default,
       temperature: 0,
       messages: [
-        { role: "system", content: this.llm.systemPrompt },
+        { role: "system", content: llm.systemPrompt },
         { role: "user", content: userPrompt },
       ],
     });
@@ -805,7 +859,28 @@ module.exports = class Robot {
     }
   }
 
-  get llm() {
+  promptRepl() {
+    repl.start({
+      prompt: `${this.name}> `,
+      useColors: true,
+      ignoreUndefined: true,
+      eval: async (cmd, context, filename, callback) => {
+        let error = null;
+        try {
+          await this.stop();
+          const input = cmd.trim();
+          if (input) {
+            await this.prompt(input);
+          }
+        } catch (err) {
+          error = err;
+        }
+        callback(error);
+      },
+    });
+  }
+
+  #llm() {
     return (this._llm ??= {
       openai: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
@@ -829,10 +904,12 @@ module.exports = class Robot {
             await this.move(event.move, 0);
           } else if (event.moveBody) {
             await this.moveBody(event.moveBody, 0);
+          } else if (event.moveJoint) {
+            await this.moveJoint(event.moveJoint, 0);
           } else if (event.body) {
-            await this.body(event.body);
+            await this.selectBody(event.body);
           } else if (event.joint) {
-            await this.joint(event.joint);
+            await this.selectJoint(event.joint);
           }
         }
       } catch (err) {
@@ -859,33 +936,33 @@ module.exports = class Robot {
         this.log("Controller connected:", controller.getDeviceInfo().product);
         const config = this.config.controller[configName];
         this.controller = {
-          buttons: {},
-          axes: {
-            values: {},
-            states: {},
+          button: {},
+          axis: {
+            value: {},
+            state: {},
           },
         };
         controller.on("data", (data) => {
-          for (const name in config.buttons) {
-            const button = config.buttons[name];
+          for (const name in config.button) {
+            const button = config.button[name];
             const offset = parseInt(button.index);
             const value = (data[offset] & button.value) !== 0 ? 1 : 0;
-            const previous = this.controller.buttons[name];
-            this.controller.buttons[name] = value;
+            const previous = this.controller.button[name];
+            this.controller.button[name] = value;
             if (!previous && value) {
               trigger(button);
             }
           }
-          for (const name in config.axes) {
-            const axis = config.axes[name];
+          for (const name in config.axis) {
+            const axis = config.axis[name];
             const offset = parseInt(axis.index);
             let value = data[offset];
-            if (axis.extend === 4) {
+            if (axis.bias === 4) {
               value = value | ((data[offset + 1] & 0x0f) << 8);
-            } else if (axis.extend === -4) {
+            } else if (axis.bias === -4) {
               value = (data[offset - 1] >> 4) | (value << 4);
             }
-            if (Math.abs(axis.extend) === 4) {
+            if (Math.abs(axis.bias) === 4) {
               value = (value - 2048) / 2048;
             } else {
               value = (value - 128) / 128;
@@ -894,10 +971,10 @@ module.exports = class Robot {
             if (Math.abs(value) < config.deadZone) {
               value = 0;
             }
-            this.controller.axes.values[name] = value;
+            this.controller.axis.value[name] = value;
             value = value === 0 ? 0 : value > 0 ? 1 : -1;
-            const previous = this.controller.axes.states[name];
-            this.controller.axes.states[name] = value;
+            const previous = this.controller.axis.state[name];
+            this.controller.axis.state[name] = value;
             if (!previous && value) {
               trigger(axis);
             }
@@ -916,38 +993,38 @@ module.exports = class Robot {
     process.stdin.setRawMode(true);
     process.stdin.resume();
 
-    const initial = Object.keys(this.config.keyboard.keys).reduce((result, key) => {
+    const initial = Object.keys(this.config.keyboard.key).reduce((result, key) => {
       result[key] = 0;
       return result;
     }, {});
     let releaseTimer = null;
-    this.config.keyboard.states = { ...initial };
+    this.config.keyboard.state = { ...initial };
     process.stdin.on("keypress", async (str, key) => {
       if (key.ctrl && key.name === "c") {
         await this.end();
         return;
       }
-      if (!(key.name in this.config.keyboard.keys)) {
+      if (!(key.name in this.config.keyboard.key)) {
         return;
       }
 
-      this.config.keyboard.states = {
+      this.config.keyboard.state = {
         ...initial,
         [key.name]: 1,
       };
       clearTimeout(releaseTimer);
       releaseTimer = setTimeout(() => {
-        this.config.keyboard.states = { ...initial };
+        this.config.keyboard.state = { ...initial };
       }, this.config.keyboard.release);
     });
 
     this.log("Keyboard control active");
 
-    let controllerStates = {
+    let controllerState = {
       current: {},
       previous: {},
     };
-    let keyboardStates = this.config.keyboard.states;
+    let keyboardState = this.config.keyboard.state;
 
     while (true) {
       if (signal?.aborted) {
@@ -957,33 +1034,33 @@ module.exports = class Robot {
       }
 
       if (this.controller) {
-        for (const stickName in controllerConfig.sticks) {
-          controllerStates.current[stickName] = { x: 0, y: 0, _: "" };
+        for (const stickName in controllerConfig.stick) {
+          controllerState.current[stickName] = { x: 0, y: 0, _: "" };
         }
 
-        for (const axisName in controllerConfig.axes) {
-          const axis = controllerConfig.axes[axisName];
-          controllerStates.current[axis.stick][axis.direction] = this.controller.axes.states[axisName] || 0;
-          controllerStates.current[axis.stick]._ +=
-            `${controllerStates.current[axis.stick]._ ? "," : ""}${axis.direction}=${controllerStates.current[axis.stick][axis.direction]}`;
+        for (const axisName in controllerConfig.axis) {
+          const axis = controllerConfig.axis[axisName];
+          controllerState.current[axis.stick][axis.direction] = this.controller.axis.state[axisName] || 0;
+          controllerState.current[axis.stick]._ +=
+            `${controllerState.current[axis.stick]._ ? "," : ""}${axis.direction}=${controllerState.current[axis.stick][axis.direction]}`;
         }
 
-        for (const stickName in controllerConfig.sticks) {
-          const stick = controllerConfig.sticks[stickName];
-          const currentControllerState = controllerStates.current[stickName];
-          const previousControllerState = controllerStates.previous[stickName];
+        for (const stickName in controllerConfig.stick) {
+          const stick = controllerConfig.stick[stickName];
+          const currentControllerState = controllerState.current[stickName];
+          const previousControllerState = controllerState.previous[stickName];
           if (stick[currentControllerState._] !== stick[previousControllerState?._]) {
             trigger(stick[currentControllerState._]);
             break;
           }
         }
-        controllerStates.previous = { ...controllerStates.current };
+        controllerState.previous = { ...controllerState.current };
       }
 
       let stop = false;
       if (this.busy()) {
-        for (const name in this.config.keyboard.states) {
-          if (keyboardStates[name] === 1 && this.config.keyboard.states[name] === 0) {
+        for (const name in this.config.keyboard.state) {
+          if (keyboardState[name] === 1 && this.config.keyboard.state[name] === 0) {
             await this.stop();
             stop = true;
             break;
@@ -992,28 +1069,18 @@ module.exports = class Robot {
       }
 
       if (!stop) {
-        for (const name in this.config.keyboard.states) {
-          if (keyboardStates[name] === 0 && this.config.keyboard.states[name] === 1) {
-            trigger(this.config.keyboard.keys[name]);
+        for (const name in this.config.keyboard.state) {
+          if (keyboardState[name] === 0 && this.config.keyboard.state[name] === 1) {
+            trigger(this.config.keyboard.key[name]);
             break;
           }
         }
       }
 
-      keyboardStates = this.config.keyboard.states;
+      keyboardState = this.config.keyboard.state;
 
-      await this.wait(this.config.durations.input);
+      await this.wait(this.config.duration.input);
     }
-  }
-
-  #toCamelCase(name) {
-    return name
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .replace(/[^a-zA-Z0-9]+/g, " ")
-      .trim()
-      .split(/\s+/)
-      .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
-      .join("");
   }
 
   async wait(milliseconds) {
@@ -1026,5 +1093,23 @@ module.exports = class Robot {
     if (this.config.log.verbose) {
       console.log(`< [${new Date().toISOString()}]`, ...args);
     }
+  }
+
+  #typeConfig(type) {
+    return Object.values(this.config.type).find((t) => t.code === type);
+  }
+
+  #toCamelCase(name) {
+    return name
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[^a-zA-Z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+      .join("");
+  }
+
+  #isObject(value) {
+    return Object.prototype.toString.call(value) === "[object Object]";
   }
 };

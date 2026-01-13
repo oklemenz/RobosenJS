@@ -7,7 +7,7 @@
     "characteristicsUuid": "ffe1",
     "header": "ffff"
   },
-  "durations": {
+  "duration": {
     "announcement": 3500,
     "warmup": 0,
     "cooldown": 1000,
@@ -20,23 +20,38 @@
     "verbose": true,
     "indent": "- "
   },
-  "types": {
-    "moveForward": "01",
-    "turnRight": "02",
-    "moveRight": "03",
-    "moveBackward": "05",
-    "moveLeft": "07",
-    "turnLeft": "08",
-    "handshake": "0b",
-    "stop": "0c",
-    "voice": "0d",
-    "state": "0f",
-    "action": "17",
-    "joint": "e8",
-    "version": "f7",
-    "date": "f8"
+  "type": {
+    "moveNorth": { "code": "01", "alt": "33", "move": true, "expose": true },
+    "moveNorthEast": { "code": "02", "alt": "38", "move": true, "expose": true },
+    "moveEast": { "code": "03", "alt": "3A", "move": true, "expose": true },
+    "moveSouth": { "code": "05", "alt": "34", "move": true, "expose": true },
+    "moveWest": { "code": "07", "alt": "39", "move": true, "expose": true },
+    "moveNorthWest": { "code": "08", "alt": "37", "move": true, "expose": true },
+    "handshake": { "code": "0b" },
+    "stop": { "code": "0c", "expose": true },
+    "volume": { "code": "0d" },
+    "state": { "code": "0f", "value": "struct" },
+    "userNames": { "code": "10", "value": "string", "list": true },
+    "actionNames": { "code": "14", "value": "string", "list": true },
+    "folderNames": { "code": "16", "value": "string", "list": true },
+    "action": { "code": "17", "value": "string", "expose": true, "progress": true },
+    "audioNames": { "code": "18", "value": "string", "list": true },
+    "audio": { "code": "19" },
+    "forward": { "code": "33", "move": true },
+    "backward": { "code": "34", "move": true },
+    "turnLeft": { "code": "37", "move": true },
+    "turnRight": { "code": "38", "move": true },
+    "shiftLeft": { "code": "39", "move": true },
+    "shiftRight": { "code": "3A", "move": true },
+    "joint": { "code": "e8" },
+    "kind": { "code": "f6", "value": "string" },
+    "version": { "code": "f7", "value": "string" },
+    "date": { "code": "f8", "value": "string" },
+    "shutdown": { "code": "fa", "expose": true },
+    "done": { "code": "fa" },
+    "failure": { "code": "ff", "value": "string" }
   },
-  "states": {
+  "state": {
     "pattern": 0,
     "battery": 1,
     "volume": 2,
@@ -46,7 +61,7 @@
     "charging": 6,
     "autoOff": 7
   },
-  "directions": {
+  "direction": {
     "moveForward": "Move Forward",
     "moveBackward": "Move Backward",
     "turnLeft": "Turn Left",
@@ -54,22 +69,28 @@
     "moveLeft": "Move Left",
     "moveRight": "Move Right"
   },
-  "commands": {
-    "Move": {
-      "Move Forward": { "type": "01", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Move Backward": { "type": "05", "description": "move south (S)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Left": { "type": "08", "description": "move north/south west (NW/SW)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Turn Right": { "type": "02", "description": "move north/south east (NE/SE)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Move Left": { "type": "07", "description": "move west (W)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Move Right": { "type": "03", "description": "move east (E)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
-      "Stop": { "stop": true, "check": false }
-    },
+  "command": {
     "Handshake": { "type": "0b", "timeout": 2000 },
     "Stop": { "type": "0c", "timeout": 2000 },
+    "Volume": { "type": "0d" },
     "State": { "type": "0f" },
+    "Kind": { "type": "f6" },
     "Version": { "type": "f7" },
     "Date": { "type": "f8" },
+    "Audio": { "type": "19" },
+    "Shutdown": { "type": "fa" },
+    "Move": {
+      "group": true,
+      "Move Forward": { "type": "01", "data": "", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Backward": { "type": "05", "data": "", "description": "move south (S)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Left": { "type": "08", "data": "", "description": "rotate left", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Turn Right": { "type": "02", "data": "", "description": "rotate right", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Left": { "type": "07", "data": "", "description": "move west (W)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Move Right": { "type": "03", "data": "", "description": "move east (E)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
+      "Stop": { "stop": true, "check": false }
+    },
     "Action": {
+      "group": true,
       "type": "17",
       "Artificial Intelligence": { "duration": 61000, "description": "music, dance" },
       "Boogaloo": { "duration": 53000, "description": "music, dance, funny" },
@@ -86,6 +107,7 @@
       "The Squat": { "duration": 19000, "description": "exercise, leg, press" }
     },
     "ProAction": {
+      "group": true,
       "type": "17",
       "Appreciation": { "duration": 5000 },
       "Back Flip": { "duration": 6500, "description": "exercise" },
@@ -143,38 +165,7 @@
       "Wave Hands": {},
       "Yield": {}
     },
-    "Control": {
-      "type": "??",
-      "Move Forward": {},
-      "Move Backward": {},
-      "Turn Left": {},
-      "Turn Right": {},
-      "Move Left": {},
-      "Move Right": {},
-      "Initial Position": {}
-    },
-    "Joint": {
-      "type": "e8",
-      "Head": {},
-      "Left Shoulder": {},
-      "Right Shoulder": {},
-      "Left Arm": {},
-      "Right Arm": {},
-      "Left Hand": {},
-      "Right Hand": {},
-      "Left Hip": {},
-      "Right Hip": {},
-      "Left Thigh": {},
-      "Right Thigh": {},
-      "Left Calf": {},
-      "Right Calf": {},
-      "Left Ankle": {},
-      "Right Ankle": {},
-      "Left Foot": {},
-      "Right Foot": {}
-    },
     "Stage": {
-      "type": "",
       "Open Arms": {},
       "Spread Legs": {},
       "Chinese Bow": {},
@@ -276,6 +267,33 @@
       "Chest Up": { "pro": true }
     }
   },
+  "body": {
+    "None": {},
+    "Head": {},
+    "Left Arm": {},
+    "Right Arm": {},
+    "Torso": {}
+  },
+  "joint": {
+    "None": {},
+    "Head": {},
+    "Left Shoulder": {},
+    "Right Shoulder": {},
+    "Left Arm": {},
+    "Right Arm": {},
+    "Left Hand": {},
+    "Right Hand": {},
+    "Left Hip": {},
+    "Right Hip": {},
+    "Left Thigh": {},
+    "Right Thigh": {},
+    "Left Calf": {},
+    "Right Calf": {},
+    "Left Ankle": {},
+    "Right Ankle": {},
+    "Left Foot": {},
+    "Right Foot": {}
+  },
   "llm": {
     "default": "gpt-4.1-mini",
     "voice": "gpt-4o-mini-transcribe",
@@ -304,7 +322,7 @@
       "usagePage": 1,
       "usage": 5,
       "deadZone": 0.2,
-      "buttons": {
+      "button": {
         "Y": { "index": 3, "value": 1, "action": "Handstand" },
         "X": { "index": 3, "value": 2, "action": "Front Flip" },
         "B": { "index": 3, "value": 4, "action": "Push Ups" },
@@ -324,33 +342,33 @@
         "L": { "index": 5, "value": 64, "action": "Left Punch" },
         "ZL": { "index": 5, "value": 128, "action": "Left Kick" }
       },
-      "axes": {
+      "axis": {
         "LeftStickX": {
           "index": 6,
-          "extend": 4,
+          "bias": 4,
           "stick": "LeftStick",
           "direction": "x"
         },
         "LeftStickY": {
           "index": 8,
-          "extend": -4,
+          "bias": -4,
           "stick": "LeftStick",
           "direction": "y"
         },
         "RightStickX": {
           "index": 9,
-          "extend": 4,
+          "bias": 4,
           "stick": "RightStick",
           "direction": "x"
         },
         "RightStickY": {
           "index": 11,
-          "extend": -4,
+          "bias": -4,
           "stick": "RightStick",
           "direction": "y"
         }
       },
-      "sticks": {
+      "stick": {
         "LeftStick": {
           "x=0,y=1": { "move": "Move Forward" },
           "x=0,y=-1": { "move": "Move Backward" },
@@ -368,7 +386,7 @@
   },
   "keyboard": {
     "release": 300,
-    "keys": {
+    "key": {
       "up": { "move": "Move Forward" },
       "down": { "move": "Move Backward" },
       "left": { "move": "Turn Left" },

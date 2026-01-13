@@ -10,10 +10,10 @@ describe("K1", () => {
   });
 
   test("build packet", () => {
-    let text = k1.packetString(k1.config.types.action, "ProAction/Left Punch");
+    let text = k1.packetString(k1.config.type.action, "ProAction/Left Punch");
     expect(text).toBe("ffff161750726f416374696f6e2f4c6566742050756e636894");
     text = k1.packetCommandString({
-      type: k1.config.types.action,
+      type: k1.config.type.action,
       data: "ProAction/Left Punch",
     });
     expect(text).toBe("ffff161750726f416374696f6e2f4c6566742050756e636894");
@@ -25,11 +25,12 @@ describe("K1", () => {
   });
 
   test("parse pro action packet", () => {
-    const text = k1.packetString(k1.config.types.action, "ProAction/Left Punch");
+    const text = k1.packetString(k1.config.type.action, "ProAction/Left Punch");
     const packet = k1.parsePacketString(text);
     expect(packet).toMatchObject({
       kind: "data",
       type: "17",
+      name: "action",
       data: "ProAction/Left Punch",
       checksum: "94",
       valid: true,
@@ -38,11 +39,12 @@ describe("K1", () => {
   });
 
   test("parse action packet", () => {
-    const text = k1.packetString(k1.config.types.action, "Action/Artificial Intelligence");
+    const text = k1.packetString(k1.config.type.action, "Action/Artificial Intelligence");
     const packet = k1.parsePacketString(text);
     expect(packet).toMatchObject({
       kind: "data",
       type: "17",
+      name: "action",
       data: "Action/Artificial Intelligence",
       checksum: "af",
       valid: true,
@@ -51,11 +53,12 @@ describe("K1", () => {
   });
 
   test("parse boolean packet", () => {
-    let text = k1.packetString(k1.config.types.handshake, false);
+    let text = k1.packetString(k1.config.type.handshake, false);
     let packet = k1.parsePacketString(text);
     expect(packet).toMatchObject({
       kind: "data",
       type: "0b",
+      name: "handshake",
       data: 0,
       checksum: "0e",
       valid: true,
@@ -66,6 +69,7 @@ describe("K1", () => {
     expect(packet).toMatchObject({
       kind: "data",
       type: "0b",
+      name: "handshake",
       data: 1,
       checksum: "0f",
       valid: true,
@@ -74,25 +78,27 @@ describe("K1", () => {
   });
 
   test("parse progress packet", () => {
-    let text = k1.packetString(k1.config.types.action, 50);
+    let text = k1.packetString(k1.config.type.action, 50);
     expect(text).toBe("ffff0317324c");
     let buffer = Buffer.from(text, "hex");
     let packet = k1.parsePacket(buffer);
     expect(packet).toMatchObject({
       kind: "progress",
       type: "17",
+      name: "action",
       data: 50,
       checksum: "4c",
       valid: true,
       raw: buffer,
     });
-    text = k1.packetString(k1.config.types.action, 100);
+    text = k1.packetString(k1.config.type.action, 100);
     expect(text).toBe("ffff0317647e");
     buffer = Buffer.from("ffff0317647e", "hex");
     packet = k1.parsePacket(buffer);
     expect(packet).toMatchObject({
       kind: "completed",
       type: "17",
+      name: "action",
       data: 100,
       checksum: "7e",
       valid: true,
@@ -101,7 +107,7 @@ describe("K1", () => {
   });
 
   test("parse handshake packet", () => {
-    let text = k1.packetString(k1.config.types.handshake, "");
+    let text = k1.packetString(k1.config.type.handshake, "");
     expect(text).toBe("ffff020b0d");
     const buffer = Buffer.from(text, "hex");
     expect(buffer).toEqual(k1.packet("0b", ""));
@@ -109,6 +115,7 @@ describe("K1", () => {
     expect(packet).toMatchObject({
       kind: "data",
       type: "0b",
+      name: "handshake",
       data: "",
       checksum: "0d",
       valid: true,
@@ -117,14 +124,15 @@ describe("K1", () => {
   });
 
   test("parse stop packet", () => {
-    let text = k1.packetString(k1.config.types.stop, "");
+    let text = k1.packetString(k1.config.type.stop, "");
     expect(text).toBe("ffff020c0e");
     const buffer = Buffer.from(text, "hex");
     expect(buffer).toEqual(k1.packet("0c", ""));
     const packet = k1.parsePacket(buffer);
     expect(packet).toMatchObject({
-      kind: "data",
+      kind: "stop",
       type: "0c",
+      name: "stop",
       data: "",
       checksum: "0e",
       valid: true,
@@ -132,23 +140,42 @@ describe("K1", () => {
     });
   });
 
+  test("parse volume packet", () => {
+    let text = k1.packetString(k1.config.type.volume, 50);
+    expect(text).toBe("ffff030d3242");
+    const buffer = Buffer.from(text, "hex");
+    expect(buffer).toEqual(k1.packet("0d", 50));
+    const packet = k1.parsePacket(buffer);
+    expect(packet).toMatchObject({
+      kind: "data",
+      type: "0d",
+      name: "volume",
+      data: 50,
+      checksum: "42",
+      valid: true,
+      raw: buffer,
+    });
+  });
+
   test("parse state packet", () => {
-    let text = k1.packetString(k1.config.types.state, "");
+    let text = k1.packetString(k1.config.type.state, "");
     expect(text).toBe("ffff020f11");
     const requestPacket = k1.parsePacketString(text);
     expect(requestPacket).toMatchObject({
       kind: "data",
       type: "0f",
+      name: "state",
       checksum: "11",
       valid: true,
       raw: Buffer.from(text, "hex"),
     });
-    text = k1.packetString(k1.config.types.state, Buffer.from("0020820000010001", "hex"));
+    text = k1.packetString(k1.config.type.state, Buffer.from("0020820000010001", "hex"));
     expect(text).toBe("ffff0a0f0020820000010001bd");
     const responsePacket = k1.parsePacketString(text);
     expect(responsePacket).toMatchObject({
       kind: "data",
       type: "0f",
+      name: "state",
       checksum: "bd",
       valid: true,
       raw: Buffer.from(text, "hex"),
@@ -171,6 +198,7 @@ describe("K1", () => {
     expect(packet).toMatchObject({
       kind: "data",
       type: "17",
+      name: "action",
       data: "UP",
       checksum: "50",
       valid: false,

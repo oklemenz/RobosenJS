@@ -1,108 +1,120 @@
-type MoveDirection =
-    | "Move Forward"
-    | "Move Backward"
-    | "Turn Left"
-    | "Turn Right"
-    | "Move Left"
-    | "Move Right"
-    | "Stop";
+type PacketKind =
+    | "none"
+    | "data"
+    | "progress"
+    | "completed"
+    | "stop"
+    | "invalid";
 
-type ActionName =
-    | "Artificial Intelligence"
-    | "Boogaloo"
-    | "Cyberpunk"
-    | "Digital Night"
-    | "Funky Wiggle"
-    | "Lay Back"
-    | "Mechanical Beats"
-    | "Robot Talk"
-    | "Rocking Soul"
-    | "Funny"
-    | "Easy Action"
-    | "Quick sneak"
-    | "The Squat"
-    | "Appreciation"
-    | "Back Flip"
-    | "Battle State"
-    | "Bow, Please"
-    | "Crazy"
-    | "Cross Arms"
-    | "Crouch Down"
-    | "Do Dog Barks"
-    | "Do Exercise"
-    | "Do Squats"
-    | "Fire In The Hole!"
-    | "Front Flip"
-    | "Handstand"
-    | "Kneel,Please"
-    | "Kung Fu"
-    | "Lay Down"
-    | "Left Kick"
-    | "Left Punch"
-    | "Mountain Running"
-    | "Play Cool"
-    | "Play Dead"
-    | "Pretend To Fart"
-    | "Push Ups"
-    | "Right Kick"
-    | "Right Punch"
-    | "Take A Pee"
-    | "Take A Poop"
-    | "Take A Seat"
-    | "Twist Butt"
-    | "Bend Back"
-    | "Celebrate"
-    | "Close Combat"
-    | "Defend The Enemies"
-    | "Do Cat Meows"
-    | "Double Punch"
-    | "Horse Stance"
-    | "Keep Rolling Backward"
-    | "Launch Cannon"
-    | "Lay Face Down"
-    | "Lean Back"
-    | "Lean Forward"
-    | "Open Fire"
-    | "Play Drum"
-    | "Propose"
-    | "Ready To Strafe"
-    | "Say Hello"
-    | "Start Shooting"
-    | "Swing Arms"
-    | "Swing Left To Right"
-    | "Swing Left"
-    | "Swing Right"
-    | "Tilt Left"
-    | "Tilt Right"
-    | "Wave Hands"
-    | "Yield";
+type PacketType =
+    | "00" // InstructMoves
+    | "01" // MoveNorth
+    | "02" // MoveNE
+    | "03" // MoveEast
+    | "04" // MoveSE
+    | "05" // MoveSouth
+    | "06" // MoveSW
+    | "07" // MoveWest
+    | "08" // MoveNW
+    | "09" // RegularMoves
+    | "0A" // Transform
+    | "0B" // HandShake
+    | "0C" // StopMove
+    | "0D" // VoiceControl
+    | "0E" // NoneUsed
+    | "0F" // States
+    | "10" // GetUserActionName
+    | "11" // GyrosOfforOn
+    | "13" // RobotAutoOff
+    | "14" // GetOffActionName
+    | "15" // OfficialMoves
+    | "16" // GetFolderActionNames
+    | "17" // FolderActionNameMovesOrActionProgress
+    | "18" // GetFolderAudioNames
+    | "19" // PlayAudioInFolder
+    | "1A" // SetAutoTurn
+    | "1B" // SetAutoPose
+    | "33" // forward
+    | "34" // back
+    | "36" // fire
+    | "37" // Turn_left
+    | "38" // Turn_right
+    | "39" // shift_left
+    | "3A" // right_shift
+    | "D3" // Eye_lights_are_always_on
+    | "D4" // blinking_eye_lights
+    | "D5" // Excessive_discoloration
+    | "D6" // breathing_light
+    | "D7" // Marquee
+    | "DC" // CreatNewRobotActionFileAndDone
+    | "DD" // DeleteActionByFilePath
+    | "E3" // WriteDataToNewFileAndWriteSuccess
+    | "E6" // InEditor
+    | "E7" // ExitEditor
+    | "E8" // MoveJoint
+    | "E9" // RobotUpJoint
+    | "EA" // UnLockAllJoint
+    | "EB" // LockAllJoint
+    | "EC" // OneJointLockControl
+    | "ED" // JointLockControl
+    | "EE" // PlayAudioControl
+    | "F4" // RobotNormalPos
+    | "F5" // RobotOnUSBMode
+    | "F6" // GetRobotKindName
+    | "F7" // GetRobotVersion
+    | "F8" // GetRobotVersionDate
+    | "FA" // GetFileNameDone / RobotShutDown
+    | "FF" // Failure
+    ;
 
-type BodyName =
-    | "None"
-    | "Head"
-    | "Left Arm"
-    | "Right Arm"
-    | "Torso";
+interface Command {
+    type: string;
+    data?: string | number | boolean | Buffer;
+}
 
-type JointName =
-    | "None"
-    | "Head"
-    | "Left Shoulder"
-    | "Right Shoulder"
-    | "Left Arm"
-    | "Right Arm"
-    | "Left Hand"
-    | "Right Hand"
-    | "Left Hip"
-    | "Right Hip"
-    | "Left Thigh"
-    | "Right Thigh"
-    | "Left Calf"
-    | "Right Calf"
-    | "Left Ankle"
-    | "Right Ankle"
-    | "Left Foot"
-    | "Right Foot";
+interface Packet {
+    kind?: PacketKind;
+    type: PacketType;
+    name?: string;
+    data?: string | number;
+    bytes?: Buffer;
+    checksum?: string;
+    valid?: boolean;
+    raw?: Buffer;
+
+    toString(): string;
+
+    toLogString(): string;
+}
+
+interface Receive {
+    kind?: PacketKind,
+    type: PacketType,
+    collect?: PacketType,
+    result?: Packet[]
+}
+
+interface State {
+    pattern: number,
+    battery: number,
+    volume: number,
+    progress: number,
+    autoPose: number,
+    autoTurn: number,
+    charging: number,
+    autoOff: number
+}
+
+interface Parameters {
+    command: Command,
+    receive?: Receive,
+    limited?: boolean,
+    check?: boolean,
+    block?: boolean,
+    wait?: boolean,
+    measure?: boolean,
+    timeout?: number
+}
 
 interface RobotOptions {
     [key: string]: any;
@@ -125,213 +137,97 @@ export class Robot {
 
     connected(): boolean;
 
-    handshake(): Promise<any>;
-
-    version(): Promise<any>;
-
-    date(): Promise<any>;
-
-    state(): Promise<any>;
-
-    parseState(state: string): object;
-
-    move(direction: MoveDirection, time?: number): Promise<any>;
-
-    moveForward(time?: number): Promise<any>;
-
-    moveBackward(time?: number): Promise<any>;
-
-    turnLeft(time?: number): Promise<any>;
-
-    turnRight(time?: number): Promise<any>;
-
-    moveLeft(time?: number): Promise<any>;
-
-    moveRight(time?: number): Promise<any>;
-
-    moveBody(direction: number, time?: number): Promise<any>;
-
-    moveJoint(direction: number, time?: number): Promise<any>;
+    handshake(): Promise<void>;
 
     stop(): Promise<void>;
 
-    commands(group: string, name?: string): { [name: string]: object } | object;
+    shutdown(): Promise<void>;
 
-    actions(name?: String): { [name: string]: object } | object;
+    kind(): Promise<string>;
 
-    action(name: ActionName, limited?: boolean): Promise<any>;
+    version(): Promise<string>;
 
-    perform({command, receive, timeout, check, block, wait, measure}): Promise<any>;
+    date(): Promise<string>;
 
-    call(command: object, receive?: { kind: string, type: string }, timeout?: number, measure?: boolean): Promise<any>;
+    state(): Promise<State>;
 
-    send(command: object | string | Buffer): Promise<any>;
+    parseState(state: string): State;
 
-    packet(type, data): Buffer;
+    list(type: PacketType): Promise<string[]>;
 
-    packetCommand(command: object | string | Buffer): Buffer;
+    listActionNames(): Promise<string[]>;
 
-    packetCommandString(command: object | string | Buffer): String;
+    listUserNames(): Promise<string[]>;
 
-    packetString(type: String, data: any): String;
+    listFolderNames(): Promise<string[]>;
 
-    parsePacket(buffer: Buffer): object;
+    listAudioNames(): Promise<string[]>;
 
-    parsePacketString(text: String): object;
+    volume(level: number): Promise<void>;
 
-    body(body: BodyName);
+    audio(name: string): Promise<any>;
 
-    joint(joint: JointName);
+    move(direction: string, time?: number): Promise<Packet>;
+
+    moveForward(time?: number): Promise<Packet>;
+
+    moveBackward(time?: number): Promise<Packet>;
+
+    turnLeft(time?: number): Promise<Packet>;
+
+    turnRight(time?: number): Promise<Packet>;
+
+    moveLeft(time?: number): Promise<Packet>;
+
+    moveRight(time?: number): Promise<Packet>;
+
+    moveBody(direction: number, time?: number): Promise<Packet>;
+
+    moveJoint(direction: number, time?: number): Promise<Packet>;
+
+    commands(group: string, name?: string): { [name: string]: Command[] } | Command;
+
+    actions(name?: string): { [name: string]: Command[] } | Command;
+
+    action(name: string, limited?: boolean): Promise<Packet>;
+
+    perform({command, receive, limited, check, block, wait, measure, timeout}: Parameters): Promise<Packet>;
+
+    call(command: Command, receive?: Receive, measure?: boolean, timeout?: number): Promise<Packet>;
+
+    send(command: Command | string | Buffer): Promise<any>;
+
+    packet(type: PacketType, data: string | number | boolean | Buffer): Buffer;
+
+    packetString(type: PacketType, data: string | number | boolean | Buffer): string;
+
+    packetCommand(command: Command | string | Buffer): Buffer;
+
+    packetCommandString(command: Command | string | Buffer): string;
+
+    parsePacket(buffer: Buffer): Packet;
+
+    parsePacketString(string: string): Packet;
+
+    checksum(buffer: Buffer): string;
+
+    selectBody(body: string);
+
+    selectJoint(joint: string);
 
     repl(): void;
 
+    voice(signal?: AbortSignal): Promise<void>;
+
     voiceRepl(): Promise<void>;
-
-    voice(signal: AbortSignal): Promise<void>;
-
-    promptRepl(): void;
 
     prompt(prompt: string): Promise<void>;
 
-    control(signal: AbortSignal): Promise<void>;
+    promptRepl(): void;
+
+    control(signal?: AbortSignal): Promise<void>;
 
     wait(milliseconds: number): Promise<void>;
 
     log(...args: any[]): void;
-
-    artificialIntelligence(): Promise<any>;
-
-    boogaloo(): Promise<any>;
-
-    cyberpunk(): Promise<any>;
-
-    digitalNight(): Promise<any>;
-
-    funkyWiggle(): Promise<any>;
-
-    layBack(): Promise<any>;
-
-    mechanicalBeats(): Promise<any>;
-
-    robotTalk(): Promise<any>;
-
-    rockingSoul(): Promise<any>;
-
-    funny(): Promise<any>;
-
-    easyAction(): Promise<any>;
-
-    quickSneak(): Promise<any>;
-
-    theSquat(): Promise<any>;
-
-    appreciation(): Promise<any>;
-
-    backFlip(): Promise<any>;
-
-    battleState(): Promise<any>;
-
-    bowPlease(): Promise<any>;
-
-    crazy(): Promise<any>;
-
-    crossArms(): Promise<any>;
-
-    crouchDown(): Promise<any>;
-
-    doDogBarks(): Promise<any>;
-
-    doExercise(): Promise<any>;
-
-    doSquats(): Promise<any>;
-
-    fireInTheHole(): Promise<any>;
-
-    frontFlip(): Promise<any>;
-
-    handstand(): Promise<any>;
-
-    kneelPlease(): Promise<any>;
-
-    kungFu(): Promise<any>;
-
-    layDown(): Promise<any>;
-
-    leftKick(): Promise<any>;
-
-    leftPunch(): Promise<any>;
-
-    mountainRunning(): Promise<any>;
-
-    playCool(): Promise<any>;
-
-    playDead(): Promise<any>;
-
-    pretendToFart(): Promise<any>;
-
-    pushUps(): Promise<any>;
-
-    rightKick(): Promise<any>;
-
-    rightPunch(): Promise<any>;
-
-    takeAPee(): Promise<any>;
-
-    takeAPoop(): Promise<any>;
-
-    takeASeat(): Promise<any>;
-
-    twistButt(): Promise<any>;
-
-    bendBack(): Promise<any>;
-
-    celebrate(): Promise<any>;
-
-    closeCombat(): Promise<any>;
-
-    defendTheEnemies(): Promise<any>;
-
-    doCatMeows(): Promise<any>;
-
-    doublePunch(): Promise<any>;
-
-    horseStance(): Promise<any>;
-
-    keepRollingBackward(): Promise<any>;
-
-    launchCannon(): Promise<any>;
-
-    layFaceDown(): Promise<any>;
-
-    leanBack(): Promise<any>;
-
-    leanForward(): Promise<any>;
-
-    openFire(): Promise<any>;
-
-    playDrum(): Promise<any>;
-
-    propose(): Promise<any>;
-
-    readyToStrafe(): Promise<any>;
-
-    sayHello(): Promise<any>;
-
-    startShooting(): Promise<any>;
-
-    swingArms(): Promise<any>;
-
-    swingLeftToRight(): Promise<any>;
-
-    swingLeft(): Promise<any>;
-
-    swingRight(): Promise<any>;
-
-    tiltLeft(): Promise<any>;
-
-    tiltRight(): Promise<any>;
-
-    waveHands(): Promise<any>;
-
-    yield(): Promise<any>;
 }
