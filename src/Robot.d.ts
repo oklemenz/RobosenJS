@@ -122,7 +122,7 @@ interface RobotOptions {
 }
 
 export class Robot {
-    constructor(name: string, options?: RobotOptions);
+    constructor(name?: string, options?: RobotOptions);
 
     on(): Promise<void>;
 
@@ -130,13 +130,13 @@ export class Robot {
 
     end(): Promise<void>;
 
+    connected(): boolean;
+
     ready(): boolean;
 
     busy(): boolean;
 
     stopping(): boolean;
-
-    connected(): boolean;
 
     handshake(): Promise<void>;
 

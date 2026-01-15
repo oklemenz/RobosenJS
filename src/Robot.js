@@ -14,6 +14,15 @@ const OpenAI = require("openai");
 
 process.loadEnvFile(".env");
 
+const CONFIG_FILE = "robot";
+
+const BLE = {
+  STATE_CHANGE: "stateChange",
+  POWERED_ON: "poweredOn",
+  DISCOVER: "discover",
+  DATA: "data",
+};
+
 const STATUS = {
   INITIAL: 0,
   READY: 1,
@@ -32,18 +41,42 @@ const PACKET = {
 
 /** @type {import('./robot')} */
 module.exports = class Robot {
-  constructor(code, options = {}) {
-    this.code = code;
-    this.name = code;
+  constructor(code = "", options = {}) {
     this.folder = path.join(__dirname, code);
     this.config = {
-      ...require(path.join(this.folder, options?.file ?? "robot")),
+      spec: {},
+      log: {},
+      duration: {},
+      state: {},
+      type: {},
+      command: {},
+      body: {},
+      joint: {},
+      llm: {},
+      recording: {},
+      controller: {},
+      keyboard: {},
+      ...this.#loadConfig(options),
       ...options,
     };
+    this.code = this.config.code ?? code;
+    this.name = this.config.name ?? this.code;
     this.status = STATUS.INITIAL;
     this.body = this.config.body.None;
     this.joint = this.config.joint.None;
     this.#setup();
+  }
+
+  #loadConfig(options) {
+    let fileName = options?.file ?? CONFIG_FILE;
+    fileName += !fileName.endsWith(".json") ? ".json" : "";
+    const filePath = path.join(this.folder, fileName);
+    try {
+      const config = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(config);
+    } catch (error) {
+      this.log(`Cannot load configuration at "${filePath}"`, error.message);
+    }
   }
 
   #setup() {
@@ -83,9 +116,16 @@ module.exports = class Robot {
 
   async on() {
     this.log("Waiting for Bluetooth powered on ...");
+    const discoverPromise = new Promise((resolve) => {
+      noble.on(BLE.DISCOVER, async (peripheral) => {
+        if (peripheral.advertisement.localName === this.name || peripheral.advertisement.localName?.includes(this.code)) {
+          resolve(peripheral);
+        }
+      });
+    });
     await new Promise((resolve) => {
-      noble.on("stateChange", (state) => {
-        if (state === "poweredOn") {
+      noble.on(BLE.STATE_CHANGE, (state) => {
+        if (state === BLE.POWERED_ON) {
           this.log("Bluetooth powered on");
           resolve(state);
         } else {
@@ -95,17 +135,11 @@ module.exports = class Robot {
     });
     this.log("Scanning for", this.config.code, "...");
     await noble.startScanningAsync([this.config.spec.serviceUuid], false);
-    this.peripheral = await new Promise((resolve) => {
-      noble.on("discover", async (peripheral) => {
-        if (peripheral.advertisement.localName === this.config.name || peripheral.advertisement.localName?.includes(this.config.code)) {
-          resolve(peripheral);
-        }
-      });
-    });
+    this.peripheral = await discoverPromise;
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
     this.characteristic = await this.#connect();
-    await this.wait(this.config.duration.announcement);
+    await this.wait(this.config.duration?.announcement);
     this.log("Connected to", this.name);
     this.status = STATUS.READY;
   }
@@ -116,9 +150,9 @@ module.exports = class Robot {
       characteristics: [characteristic],
     } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync([this.config.spec.serviceUuid], [this.config.spec.characteristicsUuid]);
     await characteristic.subscribeAsync();
-    characteristic.on("data", (data) => {
+    characteristic.on(BLE.DATA, (data) => {
       const packet = this.parsePacket(data);
-      this.log(this.config.log.indent + "Response", packet.toLogString());
+      this.log(this.config.log?.indent + "Response", packet.toLogString());
     });
     return characteristic;
   }
@@ -149,6 +183,10 @@ module.exports = class Robot {
     return await this.off(true);
   }
 
+  connected() {
+    return this.status !== STATUS.INITIAL;
+  }
+
   ready() {
     return this.status === STATUS.READY;
   }
@@ -159,10 +197,6 @@ module.exports = class Robot {
 
   stopping() {
     return this.status === STATUS.STOP;
-  }
-
-  connected() {
-    return this.status !== STATUS.INITIAL;
   }
 
   #checkConnected() {
@@ -277,7 +311,7 @@ module.exports = class Robot {
     });
   }
 
-  async actionNames() {
+  async listActionNames() {
     return await this.list(this.config.type.actionNames);
   }
 
@@ -408,6 +442,7 @@ module.exports = class Robot {
   }
 
   async action(name, limited = false) {
+    name = name?.name ?? name;
     const action = this.actions(name);
     if (!action) {
       this.log("Unknown action", name);
@@ -426,7 +461,7 @@ module.exports = class Robot {
       this.log(`Performing ${action.data} ...`);
     }
     const timeout =
-      (action?.duration > 0 ? action.duration + (this.config.duration.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration.timeout;
+      (action?.duration > 0 ? action.duration + (this.config.duration?.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration?.timeout;
     const packet = await this.perform({
       command: action,
       receive: { kind: action.receive ?? PACKET.COMPLETED },
@@ -447,19 +482,19 @@ module.exports = class Robot {
     if (block) {
       this.status = STATUS.BUSY;
       if (wait) {
-        await this.wait(this.config.duration.warmup);
+        await this.wait(this.config.duration?.warmup);
       }
     }
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
       receive.type ??= command.type;
       receive.kind ??= command.receive ?? PACKET.DATA;
-      timeout ??= command.timeout ?? this.config.duration.timeout;
+      timeout ??= command.timeout ?? this.config.duration?.timeout;
       received = new Promise((resolve) => {
         const handle =
           timeout > 0 &&
           setTimeout(() => {
-            this.characteristic.off("data", fnData);
+            this.characteristic.off(BLE.DATA, fnData);
             this.log("Timeout");
             resolve();
           }, timeout);
@@ -472,11 +507,11 @@ module.exports = class Robot {
             if (handle) {
               clearTimeout(handle);
             }
-            this.characteristic.off("data", fnData);
+            this.characteristic.off(BLE.DATA, fnData);
             resolve(packet);
           }
         };
-        this.characteristic.on("data", fnData);
+        this.characteristic.on(BLE.DATA, fnData);
       });
     }
     let timedLimited;
@@ -497,10 +532,10 @@ module.exports = class Robot {
     const packet = await received;
     if (measure) {
       const elapsedMs = performance.now() - start;
-      this.log(this.config.log.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
+      this.log(this.config.log?.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     }
     if (wait) {
-      await this.wait(this.config.duration.cooldown);
+      await this.wait(this.config.duration?.cooldown);
       if (block && command.block !== false && (timedLimited || received)) {
         this.status = STATUS.READY;
       }
@@ -808,7 +843,7 @@ module.exports = class Robot {
           keyPressed().then(async () => {
             controller.abort();
             await this.stop();
-            await this.wait(this.config.duration.stop);
+            await this.wait(this.config.duration?.stop);
           }),
           this.voice({ signal: controller.signal }),
         ]);
@@ -894,33 +929,33 @@ module.exports = class Robot {
     });
   }
 
-  async control({ signal } = {}) {
-    const trigger = async (event) => {
-      try {
-        if (this.busy()) {
-          if (event.stop) {
-            await this.stop();
-          }
-        } else {
-          if (event.action) {
-            await this.action(event.action);
-          } else if (event.move) {
-            await this.move(event.move, 0);
-          } else if (event.moveBody) {
-            await this.moveBody(event.moveBody, 0);
-          } else if (event.moveJoint) {
-            await this.moveJoint(event.moveJoint, 0);
-          } else if (event.body) {
-            await this.selectBody(event.body);
-          } else if (event.joint) {
-            await this.selectJoint(event.joint);
-          }
+  async #trigger(event) {
+    try {
+      if (this.busy()) {
+        if (event.stop) {
+          await this.stop();
         }
-      } catch (err) {
-        this.log(err);
+      } else {
+        if (event.action) {
+          await this.action(event.action);
+        } else if (event.move) {
+          await this.move(event.move, 0);
+        } else if (event.moveBody) {
+          await this.moveBody(event.moveBody, 0);
+        } else if (event.moveJoint) {
+          await this.moveJoint(event.moveJoint, 0);
+        } else if (event.body) {
+          await this.selectBody(event.body);
+        } else if (event.joint) {
+          await this.selectJoint(event.joint);
+        }
       }
-    };
+    } catch (err) {
+      this.log(err);
+    }
+  }
 
+  async control({ signal } = {}) {
     const devices = hid.devices();
     let device;
     let controller;
@@ -954,7 +989,7 @@ module.exports = class Robot {
             const previous = this.controller.button[name];
             this.controller.button[name] = value;
             if (!previous && value) {
-              trigger(button);
+              this.#trigger(button);
             }
           }
           for (const name in config.axis) {
@@ -980,7 +1015,7 @@ module.exports = class Robot {
             const previous = this.controller.axis.state[name];
             this.controller.axis.state[name] = value;
             if (!previous && value) {
-              trigger(axis);
+              this.#trigger(axis);
             }
           }
         });
@@ -1054,7 +1089,7 @@ module.exports = class Robot {
           const currentControllerState = controllerState.current[stickName];
           const previousControllerState = controllerState.previous[stickName];
           if (stick[currentControllerState._] !== stick[previousControllerState?._]) {
-            trigger(stick[currentControllerState._]);
+            this.#trigger(stick[currentControllerState._]);
             break;
           }
         }
@@ -1075,7 +1110,7 @@ module.exports = class Robot {
       if (!stop) {
         for (const name in this.config.keyboard.state) {
           if (keyboardState[name] === 0 && this.config.keyboard.state[name] === 1) {
-            trigger(this.config.keyboard.key[name]);
+            this.#trigger(this.config.keyboard.key[name]);
             break;
           }
         }
@@ -1083,7 +1118,7 @@ module.exports = class Robot {
 
       keyboardState = this.config.keyboard.state;
 
-      await this.wait(this.config.duration.input);
+      await this.wait(this.config.duration?.input);
     }
   }
 
@@ -1094,7 +1129,7 @@ module.exports = class Robot {
   }
 
   log(...args) {
-    if (this.config.log.verbose) {
+    if (this.config?.log?.verbose) {
       console.log(`< [${new Date().toISOString()}]`, ...args);
     }
   }
