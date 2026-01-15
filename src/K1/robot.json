@@ -25,9 +25,9 @@
     "battery": 1,
     "volume": 2,
     "progress": 3,
-    "autoPose": 4,
+    "autoStand": 4,
     "autoTurn": 5,
-    "charging": 6,
+    "autoPose": 6,
     "autoOff": 7
   },
   "type": {
@@ -39,9 +39,11 @@
     "moveNorthWest": { "code": "08", "alt": "37", "move": true, "expose": true },
     "handshake": { "code": "0b" },
     "stop": { "code": "0c", "expose": true },
-    "volume": { "code": "0d" },
+    "volume": { "code": "0d", "min": 0, "max": 140, "expose": true },
     "state": { "code": "0f", "value": "struct", "expose": true },
     "userNames": { "code": "10", "value": "string", "list": true },
+    "autoStand": { "code": "11", "toggle": true, "expose": true },
+    "autoOff": { "code": "13", "toggle": true, "expose": true },
     "actionNames": { "code": "14", "value": "string", "list": true },
     "folderNames": { "code": "16", "value": "string", "list": true },
     "action": { "code": "17", "value": "string", "expose": true, "progress": true },
@@ -62,15 +64,39 @@
     "failure": { "code": "ff", "value": "string" }
   },
   "command": {
-    "Handshake": { "type": "0b", "timeout": 2000, "block": false },
-    "Stop": { "type": "0c", "timeout": 2000, "block": false },
-    "Volume": { "type": "0d", "receive": "none", "block": false, "description": "audio" },
-    "State": { "type": "0f", "receive": "data", "block": false, "description": "information" },
-    "Kind": { "type": "f6", "receive": "data", "block": false, "description": "information, name" },
-    "Version": { "type": "f7", "receive": "data", "block": false, "description": "information" },
-    "Date": { "type": "f8", "receive": "data", "block": false, "description": "information" },
-    "Audio": { "type": "19", "receive": "none", "block": false, "description": "play" },
-    "Shutdown": { "type": "fa", "receive": "none", "block": false, "status": 0, "description": "off, bye, see you" },
+    "System": {
+      "group": true,
+      "Handshake": { "type": "0b", "timeout": 2000, "block": false },
+      "Stop": { "type": "0c", "timeout": 2000, "block": false },
+      "Shutdown": { "type": "fa", "receive": "none", "block": false, "status": 0, "description": "off", "end": true },
+      "End": { "type": "fa", "receive": "none", "block": false, "status": 0, "description": "bye", "end": true },
+      "Exit": { "type": "fa", "receive": "none", "block": false, "status": 0, "description": "see you", "end": true }
+    },
+    "Info": {
+      "group": true,
+      "State": { "type": "0f", "receive": "data", "block": false, "description": "information" },
+      "Kind": { "type": "f6", "receive": "data", "block": false, "description": "information, name" },
+      "Version": { "type": "f7", "receive": "data", "block": false, "description": "information" },
+      "Date": { "type": "f8", "receive": "data", "block": false, "description": "information" }
+    },
+    "Config": {
+      "group": true,
+      "AutoStand": { "type": "11", "data": true, "receive": "none", "block": false, "description": "auto-stand enabled" },
+      "AutoStand On": { "type": "11", "data": true, "receive": "none", "block": false, "description": "auto-stand enabled" },
+      "AutoStand Off": { "type": "11", "data": false, "receive": "none", "block": false, "description": "auto-stand disabled" },
+      "AutoOff": { "type": "13", "data": true, "receive": "none", "block": false, "description": "auto-off enabled" },
+      "AutoOff On": { "type": "13", "data": true, "receive": "none", "block": false, "description": "auto-off enabled" },
+      "AutoOff Off": { "type": "13", "data": false, "receive": "none", "block": false, "description": "auto-off disabled" }
+    },
+    "Sound": {
+      "group": true,
+      "Mute": { "type": "0d", "data": 0, "receive": "none", "block": false, "description": "audio" },
+      "Volume": { "type": "0d", "data": 100, "receive": "none", "block": false, "description": "audio" },
+      "Volume Low": { "type": "0d", "data": 40, "receive": "none", "block": false, "description": "audio" },
+      "Volume Medium": { "type": "0d", "data": 80, "receive": "none", "block": false, "description": "audio" },
+      "Volume High": { "type": "0d", "data": 130, "receive": "none", "block": false, "description": "audio" },
+      "Audio": { "type": "19", "receive": "none", "block": false, "description": "play, sound, music" }
+    },
     "Move": {
       "group": true,
       "Move Forward": { "type": "01", "data": "", "description": "move north (N)", "receive": "none", "time": 2000, "min": 500, "max": 10000 },
@@ -137,7 +163,7 @@
       "Do Cat Meows": { "duration": 6300, "description": "animal, sound" },
       "Double Punch": { "duration": 12500, "description": "fight" },
       "Horse Stance": { "timeout": 7700, "description": "exercise" },
-      "Keep Rolling Backward": { "timeout": 17900, "description": "exercise, double, flip" },
+      "Keep Rolling Backward": { "timeout": 17900, "description": "exercise, flip, double" },
       "Launch Cannon": { "duration": 5300, "description": "fight, shoot, sound" },
       "Lay Face Down": { "duration": 12600, "description": "relax" },
       "Lean Back": { "timeout": 5700, "description": "exercise" },

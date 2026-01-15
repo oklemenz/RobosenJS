@@ -227,7 +227,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Handshake ...");
-    await this.call(this.config.command.Handshake);
+    await this.call(this.config.command.System.Handshake);
   }
 
   async stop() {
@@ -236,7 +236,7 @@ module.exports = class Robot {
     }
     this.status = STATUS.STOP;
     this.log("Stopping ...");
-    await this.call(this.config.command.Stop, {
+    await this.call(this.config.command.System.Stop, {
       type: this.config.type.handshake.code,
     });
     this.status = STATUS.READY;
@@ -248,7 +248,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Shutdown ...");
-    await this.call(this.config.command.Shutdown);
+    await this.call(this.config.command.System.Shutdown);
   }
 
   async kind() {
@@ -256,7 +256,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching kind ...");
-    const packet = await this.call(this.config.command.Kind);
+    const packet = await this.call(this.config.command.Info.Kind);
     return packet?.data;
   }
 
@@ -265,7 +265,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching version ...");
-    const packet = await this.call(this.config.command.Version);
+    const packet = await this.call(this.config.command.Info.Version);
     return packet?.data;
   }
 
@@ -274,7 +274,7 @@ module.exports = class Robot {
       return false;
     }
     this.log("Fetching date ...");
-    const packet = await this.call(this.config.command.Date);
+    const packet = await this.call(this.config.command.Info.Date);
     return packet?.data;
   }
 
@@ -283,8 +283,38 @@ module.exports = class Robot {
       return;
     }
     this.log("Fetching state ...");
-    const packet = await this.call(this.config.command.State);
+    const packet = await this.call(this.config.command.Info.State);
     return packet?.state;
+  }
+
+  async toggle(type, value) {
+    if (!this.#checkConnected()) {
+      return;
+    }
+    type = type?.code ?? type;
+    const typeConfig = this.#typeConfig(type);
+    if (!typeConfig) {
+      this.log("Unknown type", type);
+    }
+    if (!typeConfig.toggle) {
+      this.log("Not a toggle type", type);
+    }
+    value = !!value;
+    this.log("Setting", typeConfig.name, "to", value);
+    await this.call(
+      { type, data: value },
+      {
+        kind: PACKET.NONE,
+      },
+    );
+  }
+
+  async toggleAutoStand(value) {
+    return await this.toggle(this.config.type.autoStand, value);
+  }
+
+  async toggleAutoOff(value) {
+    return await this.toggle(this.config.type.autoOff, value);
   }
 
   async list(type) {
@@ -331,12 +361,19 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Setting volume ...");
-    level = Math.min(Math.max(level, 0), 140);
-    await this.call({
-      ...this.config.command.Volume,
-      level,
-    });
+    const min = this.config.type.volume.min ?? 0;
+    const max = this.config.type.volume.max ?? 140;
+    level = Math.min(Math.max(level, min), max);
+    this.log("Setting volume to", level);
+    await this.call(
+      {
+        ...this.config.command.Sound.Volume,
+        data: level,
+      },
+      {
+        kind: PACKET.NONE,
+      },
+    );
   }
 
   async audio(name) {
@@ -345,7 +382,7 @@ module.exports = class Robot {
     }
     this.log("Playing audio ...");
     await this.call({
-      ...this.config.command.Audio,
+      ...this.config.command.Sound.Audio,
       data: name,
     });
   }
@@ -443,10 +480,19 @@ module.exports = class Robot {
 
   async action(name, limited = false) {
     name = name?.name ?? name;
-    const action = this.actions(name);
+    let parameter;
+    let action = this.actions(name);
     if (!action) {
-      this.log("Unknown action", name);
-      return;
+      const parts = name.split(" ");
+      if (parts.length > 1) {
+        parameter = this.#parse(parts.pop());
+        name = parts.join(" ");
+        action = this.actions(name);
+      }
+      if (!action) {
+        this.log("Unknown action", name);
+        return;
+      }
     }
     if (action.check !== false && !this.#check()) {
       return;
@@ -457,19 +503,26 @@ module.exports = class Robot {
     if (action.call) {
       return await this[action.call]();
     }
-    if (action.data) {
-      this.log(`Performing ${action.data} ...`);
-    }
+    const data = this.#isSet(parameter) ? parameter : action.data;
+    const label = this.#isSetString(data) ? data : `${action.name}: ${data}`;
+    this.log("Performing", label, action.receive !== PACKET.NONE ? "..." : "");
     const timeout =
       (action?.duration > 0 ? action.duration + (this.config.duration?.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration?.timeout;
     const packet = await this.perform({
-      command: action,
+      command: {
+        ...action,
+        data,
+      },
       receive: { kind: action.receive ?? PACKET.COMPLETED },
       limited,
       timeout,
     });
-    if (action.receive !== PACKET.NONE && action.data) {
-      this.log(`Finished ${action.data}`);
+    if (action.receive !== PACKET.NONE) {
+      this.log("Finished", label);
+    }
+    if (action.end) {
+      // eslint-disable-next-line n/no-process-exit
+      process.exit(0);
     }
     return packet;
   }
@@ -540,7 +593,7 @@ module.exports = class Robot {
         this.status = STATUS.READY;
       }
     }
-    if (command.status !== undefined && command.status !== null) {
+    if (this.#isSet(command.status)) {
       this.status = command.status;
     }
     return packet;
@@ -586,7 +639,7 @@ module.exports = class Robot {
     } else if (typeof command === "string") {
       return Buffer.from(command, "hex");
     }
-    return this.packet(command.type, command.data ?? "");
+    return this.packet(command.type, this.#isSet(command.data) ? command.data : "");
   }
 
   packetCommandString(command) {
@@ -636,7 +689,7 @@ module.exports = class Robot {
         return hex;
       },
       toLogString: () => {
-        return `<packet kind=${kind} type=${type} (${name}) data=${JSON.stringify(state) || value || bytes.toString("hex")}>`;
+        return `<packet kind=${kind} type=${type} (${name}) data=${JSON.stringify(state) ?? value ?? bytes.toString("hex")}>`;
       },
     };
   }
@@ -666,6 +719,18 @@ module.exports = class Robot {
     }
     if (typeof data === "number") {
       return [data];
+    }
+    return data;
+  }
+
+  #parse(data) {
+    if (data === "true") {
+      return true;
+    } else if (data === "false") {
+      return false;
+    }
+    if (!isNaN(parseInt(data))) {
+      return parseInt(data);
     }
     return data;
   }
@@ -1079,7 +1144,7 @@ module.exports = class Robot {
 
         for (const axisName in controllerConfig.axis) {
           const axis = controllerConfig.axis[axisName];
-          controllerState.current[axis.stick][axis.direction] = this.controller.axis.state[axisName] || 0;
+          controllerState.current[axis.stick][axis.direction] = this.controller.axis.state[axisName] ?? 0;
           controllerState.current[axis.stick]._ +=
             `${controllerState.current[axis.stick]._ ? "," : ""}${axis.direction}=${controllerState.current[axis.stick][axis.direction]}`;
         }
@@ -1150,5 +1215,13 @@ module.exports = class Robot {
 
   #isObject(value) {
     return Object.prototype.toString.call(value) === "[object Object]";
+  }
+
+  #isSet(value) {
+    return value !== undefined && value !== null && value !== "";
+  }
+
+  #isSetString(value) {
+    return typeof value === "string" && this.#isSet(value);
   }
 };

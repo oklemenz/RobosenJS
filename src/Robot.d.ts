@@ -100,9 +100,9 @@ interface State {
     battery: number,
     volume: number,
     progress: number,
-    autoPose: number,
+    autoStand: number,
     autoTurn: number,
-    charging: number,
+    autoPose: number,
     autoOff: number
 }
 
@@ -151,6 +151,12 @@ export class Robot {
     date(): Promise<string>;
 
     state(): Promise<State>;
+
+    toggle(type: PacketType, value: boolean): Promise<void>;
+
+    toggleAutoStand(value: boolean): Promise<void>;
+
+    toggleAutoOff(value: boolean): Promise<void>;
 
     list(type: PacketType): Promise<string[]>;
 
