@@ -1,16 +1,12 @@
 "use strict";
 
-jest.mock("@abandonware/noble");
-
 const noble = require("@abandonware/noble");
+
 const { Robot, K1 } = require("../");
 
 describe("Robot", () => {
   test("Connect", async () => {
-    const robot = new Robot();
-    const onPromise = robot.on();
-    noble.test(robot);
-    await onPromise;
+    const robot = await noble.test(new Robot());
     expect(noble.startScanningAsync).toHaveBeenCalled();
     expect(noble.peripheral.connectAsync).toHaveBeenCalled();
     expect(robot.connected()).toBe(true);
@@ -26,10 +22,7 @@ describe("Robot", () => {
     let k1;
 
     beforeEach(async () => {
-      k1 = new K1();
-      const onPromise = k1.on();
-      noble.test(k1);
-      await onPromise;
+      k1 = await noble.test(new K1());
     });
 
     afterEach(async () => {

@@ -413,7 +413,7 @@ module.exports = class Robot {
       }),
     );
     if (name) {
-      return commands[name];
+      return commands[name] ?? Object.values(commands).find((command) => command.name.toLowerCase() === name.toLowerCase());
     }
     return commands;
   }
@@ -436,7 +436,7 @@ module.exports = class Robot {
       return result;
     }, {});
     if (name) {
-      return actions[name];
+      return actions[name] ?? Object.values(actions).find((action) => action.name.toLowerCase() === name.toLowerCase());
     }
     return actions;
   }
@@ -497,7 +497,7 @@ module.exports = class Robot {
             this.characteristic.off(BLE.DATA, fnData);
             this.log("Timeout");
             resolve();
-          }, timeout);
+          }, timeout).unref();
         const fnData = (data) => {
           const packet = this.parsePacket(data);
           if (packet.type === receive.collect) {
@@ -1054,7 +1054,7 @@ module.exports = class Robot {
       clearTimeout(releaseTimer);
       releaseTimer = setTimeout(() => {
         this.config.keyboard.state = { ...initial };
-      }, this.config.keyboard.release);
+      }, this.config.keyboard.release).unref();
     });
 
     this.log("Keyboard control active");
@@ -1124,7 +1124,7 @@ module.exports = class Robot {
 
   async wait(milliseconds) {
     if (milliseconds > 0) {
-      return new Promise((resolve) => setTimeout(resolve, milliseconds));
+      return new Promise((resolve) => setTimeout(resolve, milliseconds).unref());
     }
   }
 

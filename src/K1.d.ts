@@ -32,7 +32,7 @@ type ActionName =
     | "Do Dog Barks"
     | "Do Exercise"
     | "Do Squats"
-    | "Fire In The Hole!"
+    | "Fire In The Hole"
     | "Front Flip"
     | "Handstand"
     | "Kneel,Please"

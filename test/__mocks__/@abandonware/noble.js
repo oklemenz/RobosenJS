@@ -48,13 +48,16 @@ class MockRobotNoble extends EventEmitter {
     this.stopScanningAsync = jest.fn(async () => {});
   }
 
-  test(robot) {
+  async test(robot) {
     this.robot = robot;
     delete this.robot.config.log;
     delete this.robot.config.duration;
     this.peripheral = new MockRobotPeripheral(this.robot);
+    const onPromise = this.robot.on();
     this.emit("stateChange", "poweredOn");
     this.emit("discover", this.peripheral);
+    await onPromise;
+    return this.robot;
   }
 
   call(fn) {
