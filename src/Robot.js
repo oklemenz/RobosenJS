@@ -39,6 +39,13 @@ const PACKET = {
   INVALID: "invalid",
 };
 
+const LOG_LEVEL = {
+  error: 0,
+  warning: 1,
+  info: 2,
+  verbose: 3,
+};
+
 /** @type {import('./robot')} */
 module.exports = class Robot {
   constructor(code = "", options = {}) {
@@ -56,9 +63,8 @@ module.exports = class Robot {
       recording: {},
       controller: {},
       keyboard: {},
-      ...this.#loadConfig(options),
-      ...options,
     };
+    this.config = { ...this.config, ...this.#loadConfig(options), ...options };
     this.code = this.config.code ?? code;
     this.name = this.config.name ?? this.code;
     this.status = STATUS.INITIAL;
@@ -75,7 +81,7 @@ module.exports = class Robot {
       const config = fs.readFileSync(filePath, "utf8");
       return JSON.parse(config);
     } catch (error) {
-      this.log("Cannot load configuration at", filePath, error.message);
+      this.logError("Cannot load configuration at", filePath, error.message ?? error);
     }
   }
 
@@ -126,7 +132,7 @@ module.exports = class Robot {
   }
 
   async on() {
-    this.log("Waiting for Bluetooth powered on ...");
+    this.logInfo("Waiting for Bluetooth powered on ...");
     const discoverPromise = new Promise((resolve) => {
       noble.on(BLE.DISCOVER, async (peripheral) => {
         if (peripheral.advertisement.localName === this.name || peripheral.advertisement.localName?.includes(this.code)) {
@@ -137,21 +143,21 @@ module.exports = class Robot {
     await new Promise((resolve) => {
       noble.on(BLE.STATE_CHANGE, (state) => {
         if (state === BLE.POWERED_ON) {
-          this.log("Bluetooth powered on");
+          this.logInfo("Bluetooth powered on");
           resolve(state);
         } else {
-          this.log("Waiting for Bluetooth powered on from", state);
+          this.logInfo("Waiting for Bluetooth powered on from", state);
         }
       });
     });
-    this.log("Scanning for", this.config.code, "...");
+    this.logInfo("Scanning for", this.config.code, "...");
     await noble.startScanningAsync([this.config.spec.serviceUuid], false);
     this.peripheral = await discoverPromise;
     this.name = this.peripheral.advertisement.localName;
     await noble.stopScanningAsync();
     this.characteristic = await this.#connect();
     await this.wait(this.config.duration?.announcement);
-    this.log("Connected to", this.name);
+    this.logInfo("Connected to", this.name);
     this.status = STATUS.READY;
   }
 
@@ -166,7 +172,10 @@ module.exports = class Robot {
     await characteristic.subscribeAsync();
     characteristic.on(BLE.DATA, (data) => {
       const packet = this.parsePacket(data);
-      this.log(this.config.log?.indent + "Response", packet.toLogString());
+      if (this.config.log?.traffic) {
+        this.log(`${this.config.log.mark ?? ""}Received`, this.config.log.traffic === "hex" ? packet.raw.toString("hex") : packet.raw);
+      }
+      this.logVerbose(`${this.config.log?.indent ?? ""}Response`, packet.toLogString());
     });
     return characteristic;
   }
@@ -183,7 +192,7 @@ module.exports = class Robot {
       }
       await noble.stopScanningAsync();
       noble.removeAllListeners();
-      this.log("Disconnected from", this.name);
+      this.logInfo("Disconnected from", this.name);
       this.status = STATUS.INITIAL;
     }
     if (end) {
@@ -215,7 +224,7 @@ module.exports = class Robot {
 
   #checkConnected() {
     if (!this.connected()) {
-      this.log("Not connected!");
+      this.logWarning("Not connected!");
       return false;
     }
     return true;
@@ -226,11 +235,11 @@ module.exports = class Robot {
       return false;
     }
     if (this.busy()) {
-      this.log("Busy ...");
+      this.logInfo("Busy ...");
       return false;
     }
     if (!this.ready()) {
-      this.log("Not ready!");
+      this.logWarning("Not ready!");
       return false;
     }
     return true;
@@ -240,7 +249,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Handshake ...");
+    this.logVerbose("Handshake ...");
     await this.call(this.config.command.System.Handshake);
   }
 
@@ -249,19 +258,19 @@ module.exports = class Robot {
       return;
     }
     this.status = STATUS.STOP;
-    this.log("Stopping ...");
+    this.logVerbose("Stopping ...");
     await this.call(this.config.command.System.Stop, {
       type: this.config.type.handshake.code,
     });
     this.status = STATUS.READY;
-    this.log("Stopped");
+    this.logVerbose("Stopped");
   }
 
   async shutdown() {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Shutdown!");
+    this.logInfo("Shutdown!");
     await this.call(this.config.command.System.Shutdown);
   }
 
@@ -269,7 +278,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Fetching kind ...");
+    this.logVerbose("Fetching kind ...");
     const packet = await this.call(this.config.command.Info.Kind);
     return packet?.data;
   }
@@ -278,7 +287,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Fetching version ...");
+    this.logVerbose("Fetching version ...");
     const packet = await this.call(this.config.command.Info.Version);
     return packet?.data;
   }
@@ -287,7 +296,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Fetching date ...");
+    this.logVerbose("Fetching date ...");
     const packet = await this.call(this.config.command.Info.Date);
     return packet?.data;
   }
@@ -296,7 +305,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return;
     }
-    this.log("Fetching state ...");
+    this.logVerbose("Fetching state ...");
     const packet = await this.call(this.config.command.Info.State);
     return packet?.state;
   }
@@ -308,13 +317,13 @@ module.exports = class Robot {
     type = type?.code ?? type;
     const typeConfig = this.#typeConfig(type);
     if (!typeConfig) {
-      this.log("Unknown type", type);
+      this.logWarning("Unknown type", type);
     }
     if (!typeConfig.toggle) {
-      this.log("Not a toggle type", type);
+      this.logWaning("Not a toggle type", type);
     }
     value = !!value;
-    this.log("Setting", typeConfig.name, "to", value);
+    this.logInfo("Setting", typeConfig.name, "to", value);
     await this.call(
       { type, data: value },
       {
@@ -331,6 +340,14 @@ module.exports = class Robot {
     return await this.toggle(this.config.type.autoOff, value);
   }
 
+  async autoTurn(value) {
+    return await this.toggle(this.config.type.autoTurn, value);
+  }
+
+  async autoPose(value) {
+    return await this.toggle(this.config.type.autoPose, value);
+  }
+
   async list(type) {
     if (!this.#checkConnected()) {
       return;
@@ -338,12 +355,12 @@ module.exports = class Robot {
     type = type?.code ?? type;
     const typeConfig = this.#typeConfig(type);
     if (!typeConfig) {
-      this.log("Unknown type", type);
+      this.logWarning("Unknown type", type);
     }
     if (!typeConfig.list) {
-      this.log("Not a list type", type);
+      this.logWarning("Not a list type", type);
     }
-    this.log("Listing", typeConfig.name, "...");
+    this.logInfo("Listing", typeConfig.name, "...");
     const receive = {
       type: this.config.type.done.code,
       collect: type,
@@ -379,7 +396,7 @@ module.exports = class Robot {
     const min = volumeType.min ?? 0;
     const max = volumeType.max ?? 140;
     level = Math.min(Math.max(level, min), max);
-    this.log("Setting volume to", level);
+    this.logInfo("Setting volume to", level);
     await this.call({
       ...this.config.command.Sound.Volume,
       data: level,
@@ -405,7 +422,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Playing audio ...");
+    this.logInfo("Playing audio ...");
     await this.call({
       ...this.config.command.Sound.Audio,
       data: name,
@@ -419,14 +436,14 @@ module.exports = class Robot {
     direction = direction?.type ?? direction;
     const moveCommand = this.config.command.Move[direction];
     if (!moveCommand) {
-      this.log("Unknown direction", direction);
+      this.logWarning("Unknown direction", direction);
       return;
     }
     if (time !== 0) {
       time ??= time ?? moveCommand.time;
       time = Math.min(Math.max(time, moveCommand.min), moveCommand.max);
     }
-    this.log(direction, "...");
+    this.logInfo(direction, "...");
     const move = this.perform({
       command: this.config.command.Move[direction],
       receive: { kind: moveCommand.receive ?? PACKET.NONE },
@@ -521,7 +538,7 @@ module.exports = class Robot {
     name = name?.name ?? name;
     const { command, parameter } = this.#lookupCommand(name, types);
     if (!command) {
-      this.log("Unknown command", name);
+      this.logWarning("Unknown command", name);
       return;
     }
     if (command.check !== false && !this.#check()) {
@@ -535,7 +552,7 @@ module.exports = class Robot {
     }
     const data = this.#isSet(parameter) ? parameter : command.data;
     const label = this.#isSetString(data) ? data : `${command.name}: ${data}`;
-    this.log("Performing", label, command.receive !== PACKET.NONE ? "..." : "");
+    this.logInfo("Performing", label, command.receive !== PACKET.NONE || limited ? "..." : "");
     const timeout =
       (command?.duration > 0 ? command.duration + (this.config.duration?.buffer ?? 0) : undefined) ??
       command?.timeout ??
@@ -550,7 +567,7 @@ module.exports = class Robot {
       timeout,
     });
     if (command.receive !== PACKET.NONE) {
-      this.log("Finished", label);
+      this.logInfo("Finished", label);
     }
     if (command.end) {
       await this.end();
@@ -587,7 +604,7 @@ module.exports = class Robot {
           timeout > 0 &&
           setTimeout(() => {
             this.characteristic.off(BLE.DATA, fnData);
-            this.log("Timeout");
+            this.logWarning("Timeout");
             resolve();
           }, timeout).unref();
         const fnData = (data) => {
@@ -611,7 +628,7 @@ module.exports = class Robot {
       if (command.time > 0) {
         timedLimited = new Promise((resolve) => {
           setTimeout(async () => {
-            this.log("Time limit reached");
+            this.logInfo("Time limit reached");
             await this.stop();
             resolve();
           }, command.time);
@@ -624,7 +641,7 @@ module.exports = class Robot {
     const packet = await received;
     if (measure) {
       const elapsedMs = performance.now() - start;
-      this.log(this.config.log?.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
+      this.logVerbose(this.config.log?.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     }
     if (wait) {
       await this.wait(this.config.duration?.cooldown);
@@ -654,7 +671,11 @@ module.exports = class Robot {
   }
 
   async send(command) {
-    return await this.characteristic.writeAsync(this.packetCommand(command), false);
+    const buffer = this.packetCommand(command);
+    if (this.config.log?.traffic) {
+      this.log(`${this.config.log.mark ?? ""}Sent`, this.config.log.traffic === "hex" ? buffer.toString("hex") : buffer);
+    }
+    return await this.characteristic.writeAsync(buffer, false);
   }
 
   packet(type, data) {
@@ -782,7 +803,7 @@ module.exports = class Robot {
     } else if (data === "false") {
       return false;
     }
-    if (!isNaN(parseInt(data))) {
+    if (!isNaN(parseInt(data)) && String(parseInt(data)) === data) {
       return parseInt(data);
     }
     return data;
@@ -883,7 +904,7 @@ module.exports = class Robot {
         }
 
         if (now - startTime >= this.config.recording.maxDuration) {
-          this.log("Processing ...");
+          this.logInfo("Processing ...");
           stopped = true;
           recording.stop();
           resolve();
@@ -892,7 +913,7 @@ module.exports = class Robot {
           if (calculateRMS(chunk) < this.config.recording.silenceThreshold) {
             silenceMs += chunkMs;
             if (silenceMs >= this.config.recording.silenceDuration) {
-              this.log("Silence detected");
+              this.logInfo("Silence detected");
               stopped = true;
               recording.stop();
               resolve();
@@ -914,18 +935,18 @@ module.exports = class Robot {
 
     const buffer = Buffer.concat(chunks);
     if (!hasVoice(buffer)) {
-      this.log("No voice detected");
+      this.logInfo("No voice detected");
       return;
     }
 
     const stream = Readable.from(buffer);
     stream.path = "prompt.wav";
-    this.log("Transcribing ...");
+    this.logInfo("Transcribing ...");
     const transcription = await this.#llm().openai.audio.transcriptions.create({
       file: stream,
       model: this.config.llm.voice,
     });
-    this.log("Recognized:", transcription.text);
+    this.logInfo("Recognized:", transcription.text);
 
     if (signal?.aborted) {
       return;
@@ -1011,12 +1032,12 @@ module.exports = class Robot {
       commands.find((command) => command.name === responseCommand.name),
     );
     if (selectedCommands.length > 0) {
-      this.log("Matching commands:", selectedCommands.map((command) => command.name).join(", "), "...");
+      this.logInfo("Matching commands:", selectedCommands.map((command) => command.name).join(", "), "...");
       for (const command of selectedCommands) {
         await this.command(command.name, undefined, true);
       }
     } else {
-      this.log("No matching commands!");
+      this.logWarning("No matching commands!");
     }
   }
 
@@ -1074,8 +1095,8 @@ module.exports = class Robot {
           this.selectJoint(event.joint);
         }
       }
-    } catch (err) {
-      this.log(err);
+    } catch (error) {
+      this.logError(error.message ?? error);
     }
   }
 
@@ -1095,10 +1116,10 @@ module.exports = class Robot {
     });
 
     if (device) {
-      this.log("Device found", configName);
+      this.logWarning("Device found", configName);
       controller = new hid.HID(device.vendorId, device.productId);
       if (controller) {
-        this.log("Controller connected:", controller.getDeviceInfo().product);
+        this.logInfo("Controller connected:", controller.getDeviceInfo().product);
         const config = this.config.controller[configName];
         this.controller = {
           button: {},
@@ -1146,12 +1167,12 @@ module.exports = class Robot {
           }
         });
         controller.on("error", (err) => {
-          this.log("Controller error", err);
+          this.logError("Controller error", err);
         });
       }
     }
     if (!controller) {
-      this.log("No controller found");
+      this.logInfo("No controller found");
     }
 
     readline.emitKeypressEvents(process.stdin);
@@ -1185,7 +1206,7 @@ module.exports = class Robot {
       }, this.config.keyboard.release).unref();
     });
 
-    this.log("Keyboard control active");
+    this.logInfo("Keyboard control active");
 
     let controllerState = {
       current: {},
@@ -1256,7 +1277,31 @@ module.exports = class Robot {
   }
 
   log(...args) {
-    if (this.config?.log?.verbose) {
+    if (this.config.log?.active) {
+      console.log(`< [${new Date().toISOString()}]`, ...args);
+    }
+  }
+
+  logError(...args) {
+    if (this.config.log?.active && (LOG_LEVEL[this.config.log.level] ?? LOG_LEVEL.warning) >= LOG_LEVEL.error) {
+      console.log(`E:[${new Date().toISOString()}]`, ...args);
+    }
+  }
+
+  logWarning(...args) {
+    if (this.config.log?.active && (LOG_LEVEL[this.config.log.level] ?? LOG_LEVEL.warning) >= LOG_LEVEL.warning) {
+      console.log(`W:[${new Date().toISOString()}]`, ...args);
+    }
+  }
+
+  logInfo(...args) {
+    if (this.config.log?.active && (LOG_LEVEL[this.config.log.level] ?? LOG_LEVEL.warning) >= LOG_LEVEL.info) {
+      console.log(`I:[${new Date().toISOString()}]`, ...args);
+    }
+  }
+
+  logVerbose(...args) {
+    if (this.config.log?.active && (LOG_LEVEL[this.config.log.level] ?? LOG_LEVEL.warning) >= LOG_LEVEL.verbose) {
       console.log(`< [${new Date().toISOString()}]`, ...args);
     }
   }

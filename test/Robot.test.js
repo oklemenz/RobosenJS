@@ -30,8 +30,8 @@ describe("Robot", () => {
     });
 
     test("Kind", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.kind, "K1", 5);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.kind, "K1", 5);
       });
       const promise = k1.kind();
       expect(call).toHaveBeenCalledTimes(1);
@@ -42,8 +42,8 @@ describe("Robot", () => {
     });
 
     test("Version", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.version, "1.2.3", 5);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.version, "1.2.3", 5);
       });
       const promise = k1.version();
       expect(call).toHaveBeenCalledTimes(1);
@@ -54,8 +54,8 @@ describe("Robot", () => {
     });
 
     test("Date", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.date, "2025-01-01", 5);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.date, "2025-01-01", 5);
       });
       const promise = k1.date();
       expect(call).toHaveBeenCalledTimes(1);
@@ -66,8 +66,8 @@ describe("Robot", () => {
     });
 
     test("State", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.state, Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]), 5);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.state, Buffer.from([0, 1, 2, 3, 4, 5, 6, 7]), 5);
       });
       const promise = k1.state();
       expect(call).toHaveBeenCalledTimes(1);
@@ -91,7 +91,7 @@ describe("Robot", () => {
       const volumeType = k1.config.type.volume;
       const max = volumeType.max;
       const level = max - 50;
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.volume(level);
       expect(call).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(false);
@@ -104,10 +104,10 @@ describe("Robot", () => {
     });
 
     test("Volume Increase", async () => {
-      noble.call(async () => {
-        noble.receive(k1.config.type.state, { volume: 50 }, 5);
+      noble.mock(async () => {
+        noble.notify(k1.config.type.state, { volume: 50 }, 5);
       });
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.increaseVolume(10);
       expect(call).toHaveBeenCalledTimes(1);
       const result = await promise;
@@ -119,10 +119,10 @@ describe("Robot", () => {
     });
 
     test("Volume Decrease", async () => {
-      noble.call(async () => {
-        noble.receive(k1.config.type.state, { volume: 50 }, 5);
+      noble.mock(async () => {
+        noble.notify(k1.config.type.state, { volume: 50 }, 5);
       });
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.decreaseVolume(10);
       expect(call).toHaveBeenCalledTimes(1);
       const result = await promise;
@@ -134,10 +134,10 @@ describe("Robot", () => {
     });
 
     test("List Action Names", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.actionNames, "Left Punch", 5);
-        noble.receive(k1.config.type.actionNames, "Right Punch", 10);
-        noble.receive(k1.config.type.done, "", 15);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.actionNames, "Left Punch", 5);
+        noble.notify(k1.config.type.actionNames, "Right Punch", 10);
+        noble.notify(k1.config.type.done, "", 15);
       });
       const promise = k1.actionNames();
       expect(call).toHaveBeenCalledTimes(1);
@@ -148,10 +148,10 @@ describe("Robot", () => {
     });
 
     test("List User Names", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.userNames, "Alice", 5);
-        noble.receive(k1.config.type.userNames, "Bob", 10);
-        noble.receive(k1.config.type.done, "", 15);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.userNames, "Alice", 5);
+        noble.notify(k1.config.type.userNames, "Bob", 10);
+        noble.notify(k1.config.type.done, "", 15);
       });
       const promise = k1.userNames();
       expect(call).toHaveBeenCalledTimes(1);
@@ -162,10 +162,10 @@ describe("Robot", () => {
     });
 
     test("List Folder Names", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.folderNames, "music", 5);
-        noble.receive(k1.config.type.folderNames, "audio", 10);
-        noble.receive(k1.config.type.done, "", 15);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.folderNames, "music", 5);
+        noble.notify(k1.config.type.folderNames, "audio", 10);
+        noble.notify(k1.config.type.done, "", 15);
       });
       const promise = k1.folderNames();
       expect(call).toHaveBeenCalledTimes(1);
@@ -176,10 +176,10 @@ describe("Robot", () => {
     });
 
     test("List Audio Names", async () => {
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.audioNames, "beep.wav", 5);
-        noble.receive(k1.config.type.audioNames, "boop.wav", 10);
-        noble.receive(k1.config.type.done, "", 15);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.audioNames, "beep.wav", 5);
+        noble.notify(k1.config.type.audioNames, "boop.wav", 10);
+        noble.notify(k1.config.type.done, "", 15);
       });
       const promise = k1.audioNames();
       expect(call).toHaveBeenCalledTimes(1);
@@ -191,7 +191,7 @@ describe("Robot", () => {
 
     test("Toggle autoOff on", async () => {
       const type = k1.config.type.autoOff;
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.autoOff(true);
       expect(call).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(false);
@@ -205,7 +205,7 @@ describe("Robot", () => {
 
     test("Toggle autoOff off", async () => {
       const type = k1.config.type.autoOff;
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.autoOff(false);
       expect(call).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(false);
@@ -219,7 +219,7 @@ describe("Robot", () => {
 
     test("Toggle autoStand on", async () => {
       const type = k1.config.type.autoStand;
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.autoStand(1);
       expect(call).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(false);
@@ -233,7 +233,7 @@ describe("Robot", () => {
 
     test("Toggle autoStand off", async () => {
       const type = k1.config.type.autoStand;
-      const call = noble.call(async () => {});
+      const call = noble.mock(async () => {});
       const promise = k1.autoStand(0);
       expect(call).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(false);
@@ -250,17 +250,17 @@ describe("Robot", () => {
       expect(leftPunch).toBeDefined();
       let commandCall;
       const performingPromise = new Promise((resolve) => {
-        commandCall = noble.call(async () => {
+        commandCall = noble.mock(async () => {
           resolve();
-          noble.receive(k1.config.type.action, 25, 5);
+          noble.notify(k1.config.type.action, 25, 5);
         });
       });
       const actionPromise = k1.leftPunch();
       await performingPromise;
       expect(commandCall).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(true);
-      const stopCall = noble.call(async () => {
-        noble.receive(k1.config.type.handshake, "", 5);
+      const stopCall = noble.mock(async () => {
+        noble.notify(k1.config.type.handshake, "", 5);
       });
       const stopPromise = k1.stop();
       expect(stopCall).toHaveBeenCalledTimes(2);
@@ -273,7 +273,7 @@ describe("Robot", () => {
     test("Move", async () => {
       let moveCall;
       const performingPromise = new Promise((resolve) => {
-        moveCall = noble.call(async () => {
+        moveCall = noble.mock(async () => {
           resolve();
         });
       });
@@ -281,8 +281,8 @@ describe("Robot", () => {
       await performingPromise;
       expect(moveCall).toHaveBeenCalledTimes(1);
       expect(k1.busy()).toBe(true);
-      const stopCall = noble.call(async () => {
-        noble.receive(k1.config.type.handshake, "", 5);
+      const stopCall = noble.mock(async () => {
+        noble.notify(k1.config.type.handshake, "", 5);
       });
       const packet = await promise;
       expect(packet).not.toBeDefined();
@@ -294,11 +294,11 @@ describe("Robot", () => {
       expect(k1.ready()).toBe(true);
       const leftPunch = k1.actions("Left Punch");
       expect(leftPunch).toBeDefined();
-      const call = noble.call(async () => {
-        noble.receive(k1.config.type.action, 25, 5);
-        noble.receive(k1.config.type.action, 50, 10);
-        noble.receive(k1.config.type.action, 75, 15);
-        noble.receive(k1.config.type.action, 100, 20);
+      const call = noble.mock(async () => {
+        noble.notify(k1.config.type.action, 25, 5);
+        noble.notify(k1.config.type.action, 50, 10);
+        noble.notify(k1.config.type.action, 75, 15);
+        noble.notify(k1.config.type.action, 100, 20);
       });
       const leftPunchPromise = k1.leftPunch();
       expect(k1.busy()).toBe(true);

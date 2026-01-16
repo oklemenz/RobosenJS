@@ -50,8 +50,8 @@ class MockRobotNoble extends EventEmitter {
 
   async test(robot) {
     this.robot = robot;
-    delete this.robot.config.log;
-    delete this.robot.config.duration;
+    this.robot.config.log.level = "error";
+    this.robot.config.duration = {};
     this.peripheral = new MockRobotPeripheral(this.robot);
     const onPromise = this.robot.on();
     this.emit("stateChange", "poweredOn");
@@ -60,14 +60,14 @@ class MockRobotNoble extends EventEmitter {
     return this.robot;
   }
 
-  call(fn) {
+  mock(fn) {
     this.peripheral.characteristic.writeAsync.mockImplementationOnce(async () => {
       await fn(this);
     });
     return this.peripheral.characteristic.writeAsync;
   }
 
-  receive(type, data, wait) {
+  notify(type, data, wait) {
     this.robot.wait(wait);
     this.peripheral.characteristic.emitPacket(type, data);
   }

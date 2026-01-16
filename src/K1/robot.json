@@ -8,7 +8,10 @@
     "header": "ffff"
   },
   "log": {
-    "verbose": true,
+    "active": true,
+    "traffic": false,
+    "level": "verbose",
+    "mark": "# ",
     "indent": "- "
   },
   "duration": {
@@ -49,6 +52,8 @@
     "action": { "code": "17", "value": "string", "progress": true },
     "audioNames": { "code": "18", "value": "string", "list": true },
     "audio": { "code": "19" },
+    "autoTurn": { "code": "1a", "toggle": true },
+    "autoPose": { "code": "1b", "toggle": true },
     "forward": { "code": "33", "move": true },
     "backward": { "code": "34", "move": true },
     "turnLeft": { "code": "37", "move": true },
@@ -106,8 +111,7 @@
       "Decrease Volume": { "func": "decreaseVolume", "value": -20 },
       "Volume Low": { "type": "0d", "data": 40, "description": "audio" },
       "Volume Medium": { "type": "0d", "data": 80, "description": "audio" },
-      "Volume High": { "type": "0d", "data": 130, "description": "audio" },
-      "Audio": { "type": "19", "parameter": true, "description": "play, sound, music" }
+      "Volume High": { "type": "0d", "data": 130, "description": "audio" }
     },
     "Move": {
       "group": true,

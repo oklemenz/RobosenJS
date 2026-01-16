@@ -158,6 +158,10 @@ export class Robot {
 
     autoOff(value: boolean): Promise<void>;
 
+    autoTurn(value: boolean): Promise<void>;
+
+    autoPose(value: boolean): Promise<void>;
+
     list(type: PacketType): Promise<string[]>;
 
     actionNames(): Promise<string[]>;
@@ -241,4 +245,12 @@ export class Robot {
     wait(milliseconds: number): Promise<void>;
 
     log(...args: any[]): void;
+
+    logError(...args: any[]): void;
+
+    logWarning(...args: any[]): void;
+
+    logInfo(...args: any[]): void;
+
+    logVerbose(...args: any[]): void;
 }
