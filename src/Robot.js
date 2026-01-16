@@ -64,7 +64,7 @@ module.exports = class Robot {
     this.status = STATUS.INITIAL;
     this.body = this.config.body.None;
     this.joint = this.config.joint.None;
-    this.#setup();
+    this.#link();
   }
 
   #loadConfig(options) {
@@ -75,32 +75,43 @@ module.exports = class Robot {
       const config = fs.readFileSync(filePath, "utf8");
       return JSON.parse(config);
     } catch (error) {
-      this.log(`Cannot load configuration at "${filePath}"`, error.message);
+      this.log("Cannot load configuration at", filePath, error.message);
     }
   }
 
-  #setup() {
+  #link() {
     ["type", "command", "body", "joint"].forEach((section) => this.#propagate(section));
     for (const group in this.config.command) {
-      if (!this.config.command[group].group) {
+      const groupConfig = this.config.command[group];
+      if (!groupConfig.group) {
         continue;
       }
-      for (const name in this.config.command[group]) {
-        const command = this.config.command[group][name];
+      for (const name in groupConfig) {
+        const command = groupConfig[name];
         if (!this.#isObject(command)) {
           continue;
         }
         command.kind ??= PACKET.DATA;
-        command.type ??= this.config.command[group].type;
         command.name ??= name;
         command.group ??= group;
-        command.data ??= `${group}/${name}`;
+        if (groupConfig.derive) {
+          command.data ??= `${group}/${name}`;
+        }
+        for (const key in groupConfig) {
+          if (["group", "derive"].includes(key)) {
+            continue;
+          }
+          const value = groupConfig[key];
+          if (!this.#isObject(value)) {
+            command[key] ??= value;
+          }
+        }
       }
     }
-    for (const action of Object.values(this.actions())) {
-      const functionName = this.#toCamelCase(action.name);
+    for (const command of Object.values(this.commands())) {
+      const functionName = this.#toCamelCase(command.name);
       this[functionName] ??= async (...args) => {
-        return await this.action(action.name, ...args);
+        return await this.command(command.name, ...args);
       };
     }
   }
@@ -148,7 +159,10 @@ module.exports = class Robot {
     await this.peripheral.connectAsync();
     const {
       characteristics: [characteristic],
-    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync([this.config.spec.serviceUuid], [this.config.spec.characteristicsUuid]);
+    } = await this.peripheral.discoverSomeServicesAndCharacteristicsAsync(
+      [this.config.spec.serviceUuid],
+      [this.config.spec.characteristicsUuid],
+    );
     await characteristic.subscribeAsync();
     characteristic.on(BLE.DATA, (data) => {
       const packet = this.parsePacket(data);
@@ -247,7 +261,7 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    this.log("Shutdown ...");
+    this.log("Shutdown!");
     await this.call(this.config.command.System.Shutdown);
   }
 
@@ -309,11 +323,11 @@ module.exports = class Robot {
     );
   }
 
-  async toggleAutoStand(value) {
+  async autoStand(value) {
     return await this.toggle(this.config.type.autoStand, value);
   }
 
-  async toggleAutoOff(value) {
+  async autoOff(value) {
     return await this.toggle(this.config.type.autoOff, value);
   }
 
@@ -341,19 +355,19 @@ module.exports = class Robot {
     });
   }
 
-  async listActionNames() {
+  async actionNames() {
     return await this.list(this.config.type.actionNames);
   }
 
-  async listUserNames() {
+  async userNames() {
     return await this.list(this.config.type.userNames);
   }
 
-  async listFolderNames() {
+  async folderNames() {
     return await this.list(this.config.type.folderNames);
   }
 
-  async listAudioNames() {
+  async audioNames() {
     return await this.list(this.config.type.audioNames);
   }
 
@@ -361,19 +375,30 @@ module.exports = class Robot {
     if (!this.#checkConnected()) {
       return false;
     }
-    const min = this.config.type.volume.min ?? 0;
-    const max = this.config.type.volume.max ?? 140;
+    const volumeType = this.config.type.volume;
+    const min = volumeType.min ?? 0;
+    const max = volumeType.max ?? 140;
     level = Math.min(Math.max(level, min), max);
     this.log("Setting volume to", level);
-    await this.call(
-      {
-        ...this.config.command.Sound.Volume,
-        data: level,
-      },
-      {
-        kind: PACKET.NONE,
-      },
-    );
+    await this.call({
+      ...this.config.command.Sound.Volume,
+      data: level,
+    });
+    return level;
+  }
+
+  async increaseVolume(step) {
+    const volumeType = this.config.type.volume;
+    const state = await this.state();
+    const level = (state.volume ?? volumeType.data) + (step ?? volumeType.step ?? 10);
+    return await this.volume(level);
+  }
+
+  async decreaseVolume(step) {
+    const volumeType = this.config.type.volume;
+    const state = await this.state();
+    const level = (state.volume ?? volumeType.data) - (step ?? volumeType.step ?? 10);
+    return await this.volume(level);
   }
 
   async audio(name) {
@@ -401,7 +426,7 @@ module.exports = class Robot {
       time ??= time ?? moveCommand.time;
       time = Math.min(Math.max(time, moveCommand.min), moveCommand.max);
     }
-    this.log(`${direction} ...`);
+    this.log(direction, "...");
     const move = this.perform({
       command: this.config.command.Move[direction],
       receive: { kind: moveCommand.receive ?? PACKET.NONE },
@@ -442,30 +467,44 @@ module.exports = class Robot {
 
   async moveJoint(direction, time) {}
 
-  commands(group, name) {
-    const commands = Object.fromEntries(
-      Object.entries(this.config.command[group] ?? {}).filter(([name]) => {
-        const command = this.config.command[group][name];
-        return this.#isObject(command) && this.#typeConfig(command.type)?.expose;
-      }),
-    );
-    if (name) {
-      return commands[name] ?? Object.values(commands).find((command) => command.name.toLowerCase() === name.toLowerCase());
+  #lookupCommand(name, types = undefined) {
+    let parameter;
+    let command = this.commands(name, types);
+    if (!command) {
+      const parts = name.split(" ");
+      if (parts.length > 1) {
+        const value = parts.pop();
+        name = parts.join(" ");
+        command = this.commands(name);
+        if (command?.parameter) {
+          parameter = this.#parse(value);
+        }
+      }
     }
-    return commands;
+    return {
+      command,
+      parameter,
+    };
   }
 
-  actions(name) {
-    const actions = Object.keys(this.config.command).reduce((result, group) => {
+  commands(name, types = undefined) {
+    types = types ? types.map((type) => type?.code ?? type) : undefined;
+    const commands = Object.keys(this.config.command).reduce((result, group) => {
       const command = this.config.command[group];
       if (this.#isObject(command)) {
         if (command.group) {
+          const groupCommands = Object.fromEntries(
+            Object.entries(this.config.command[group] ?? {}).filter(([name]) => {
+              const command = this.config.command[group][name];
+              return this.#isObject(command) && (!types?.length || types.includes(command.type));
+            }),
+          );
           result = {
             ...result,
-            ...this.commands(group),
+            ...groupCommands,
           };
         } else if (!command.group) {
-          if (this.#typeConfig(command.type)?.expose) {
+          if (!types?.length || types.includes(command.type)) {
             result[group] = command;
           }
         }
@@ -473,58 +512,58 @@ module.exports = class Robot {
       return result;
     }, {});
     if (name) {
-      return actions[name] ?? Object.values(actions).find((action) => action.name.toLowerCase() === name.toLowerCase());
+      return commands[name] ?? Object.values(commands).find((command) => command.name.toLowerCase() === name.toLowerCase());
     }
-    return actions;
+    return commands;
   }
 
-  async action(name, limited = false) {
+  async command(name, types = undefined, limited = false) {
     name = name?.name ?? name;
-    let parameter;
-    let action = this.actions(name);
-    if (!action) {
-      const parts = name.split(" ");
-      if (parts.length > 1) {
-        parameter = this.#parse(parts.pop());
-        name = parts.join(" ");
-        action = this.actions(name);
-      }
-      if (!action) {
-        this.log("Unknown action", name);
-        return;
-      }
-    }
-    if (action.check !== false && !this.#check()) {
+    const { command, parameter } = this.#lookupCommand(name, types);
+    if (!command) {
+      this.log("Unknown command", name);
       return;
     }
-    if (action.stop) {
+    if (command.check !== false && !this.#check()) {
+      return;
+    }
+    if (command.stop) {
       return await this.stop();
     }
-    if (action.call) {
-      return await this[action.call]();
+    if (command.func) {
+      return await this[command.func](command.value);
     }
-    const data = this.#isSet(parameter) ? parameter : action.data;
-    const label = this.#isSetString(data) ? data : `${action.name}: ${data}`;
-    this.log("Performing", label, action.receive !== PACKET.NONE ? "..." : "");
+    const data = this.#isSet(parameter) ? parameter : command.data;
+    const label = this.#isSetString(data) ? data : `${command.name}: ${data}`;
+    this.log("Performing", label, command.receive !== PACKET.NONE ? "..." : "");
     const timeout =
-      (action?.duration > 0 ? action.duration + (this.config.duration?.buffer ?? 0) : undefined) ?? action?.timeout ?? this.config.duration?.timeout;
+      (command?.duration > 0 ? command.duration + (this.config.duration?.buffer ?? 0) : undefined) ??
+      command?.timeout ??
+      this.config.duration?.timeout;
     const packet = await this.perform({
       command: {
-        ...action,
+        ...command,
         data,
       },
-      receive: { kind: action.receive ?? PACKET.COMPLETED },
+      receive: { kind: command.receive ?? PACKET.COMPLETED },
       limited,
       timeout,
     });
-    if (action.receive !== PACKET.NONE) {
+    if (command.receive !== PACKET.NONE) {
       this.log("Finished", label);
     }
-    if (action.end) {
-      // eslint-disable-next-line n/no-process-exit
-      process.exit(0);
+    if (command.end) {
+      await this.end();
     }
     return packet;
+  }
+
+  actions(name) {
+    return this.commands(name, [this.config.type.action]);
+  }
+
+  async action(name, limited = false) {
+    return this.command(name, [this.config.type.action], limited);
   }
 
   async perform({ command, receive = {}, limited = false, check = true, block = true, wait = true, measure = true, timeout }) {
@@ -538,10 +577,10 @@ module.exports = class Robot {
         await this.wait(this.config.duration?.warmup);
       }
     }
+    receive.kind ??= command.receive ?? PACKET.DATA;
+    receive.type ??= command.type;
     let received;
     if (receive && receive.kind !== PACKET.NONE) {
-      receive.type ??= command.type;
-      receive.kind ??= command.receive ?? PACKET.DATA;
       timeout ??= command.timeout ?? this.config.duration?.timeout;
       received = new Promise((resolve) => {
         const handle =
@@ -620,9 +659,10 @@ module.exports = class Robot {
 
   packet(type, data) {
     // | header | numBytes | command | data | checksum |
+    data = this.#encode(data);
     const headerBuffer = Buffer.from(this.config.spec.header, "hex");
     const typeBuffer = Buffer.from(type.code ?? type, "hex");
-    const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(this.#encode(data), "utf8");
+    const dataBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data, "utf8");
     const numBytesBuffer = Buffer.from([1 + dataBuffer.length + 1]); // command + data + checksum
     const bodyBuffer = Buffer.concat([numBytesBuffer, typeBuffer, dataBuffer]);
     const checksumBuffer = Buffer.from([this.checksum(bodyBuffer)]);
@@ -673,8 +713,11 @@ module.exports = class Robot {
     } else if (typeConfig?.code === this.config.type.stop.code && bytes.length === 0) {
       kind = PACKET.STOP;
     }
+    let state;
+    if (typeConfig === this.config.type.state) {
+      state = this.#decodeState(bytes);
+    }
     const name = typeConfig?.name ?? "";
-    const state = type === this.config.type.state.code ? this.#parseState(data) : undefined;
     return {
       kind,
       type,
@@ -694,13 +737,20 @@ module.exports = class Robot {
     };
   }
 
-  #parseState(state) {
-    const buffer = Buffer.from(state, "hex");
-    const result = {};
+  #encodeState(state) {
+    const buffer = Buffer.alloc(Math.max(...Object.values(this.config.state)) + 1);
     for (const [key, index] of Object.entries(this.config.state)) {
-      result[key] = buffer[index];
+      buffer[index] = state[key] ?? 0;
     }
-    return result;
+    return buffer;
+  }
+
+  #decodeState(buffer) {
+    const state = {};
+    for (const [key, index] of Object.entries(this.config.state)) {
+      state[key] = buffer[index] ?? 0;
+    }
+    return state;
   }
 
   parsePacketString(string) {
@@ -719,6 +769,9 @@ module.exports = class Robot {
     }
     if (typeof data === "number") {
       return [data];
+    }
+    if (this.#isObject(data)) {
+      return this.#encodeState(data);
     }
     return data;
   }
@@ -749,7 +802,7 @@ module.exports = class Robot {
       useColors: true,
       ignoreUndefined: true,
       completer: (line, callback) => {
-        const keys = Object.keys(this.actions());
+        const keys = Object.keys(this.commands());
         const hits = keys.filter((k) => k.startsWith(line));
         callback(null, [hits.length ? hits : keys, line]);
       },
@@ -759,7 +812,7 @@ module.exports = class Robot {
           await this.stop();
           const input = cmd.trim();
           if (input && input !== this.config.command.Move.Stop.name) {
-            await this.action(input);
+            await this.command(input);
           }
         } catch (err) {
           error = err;
@@ -935,12 +988,14 @@ module.exports = class Robot {
 
   async prompt(prompt) {
     const llm = this.#llm();
-    const actions = Object.values(this.actions());
+    const commands = Object.values(this.commands());
     const userPrompt = llm.userPrompt
       .replace("{{prompt}}", prompt)
       .replace(
-        "{{actions}}",
-        actions.map((action) => `- ${action.name} (description: ${action.description ?? ""}, duration: ${action.duration ?? "?"} ms)`).join("\n"),
+        "{{commands}}",
+        commands
+          .map((command) => `- ${command.name} (description: ${command.description ?? ""}, duration: ${command.duration ?? "?"} ms)`)
+          .join("\n"),
       );
     const response = await llm.openai.chat.completions.create({
       model: this.config.llm.default,
@@ -952,14 +1007,16 @@ module.exports = class Robot {
     });
     const responseMessage = response.choices[0].message.content;
     const responseObject = JSON.parse(responseMessage);
-    const selectedActions = responseObject.actions.filter((responseAction) => actions.find((action) => action.name === responseAction.name));
-    if (selectedActions.length > 0) {
-      this.log("Matching actions:", selectedActions.map((action) => action.name).join(", "), "...");
-      for (const action of selectedActions) {
-        await this.action(action.name, true);
+    const selectedCommands = responseObject.commands.filter((responseCommand) =>
+      commands.find((command) => command.name === responseCommand.name),
+    );
+    if (selectedCommands.length > 0) {
+      this.log("Matching commands:", selectedCommands.map((command) => command.name).join(", "), "...");
+      for (const command of selectedCommands) {
+        await this.command(command.name, undefined, true);
       }
     } else {
-      this.log("No matching actions!");
+      this.log("No matching commands!");
     }
   }
 
@@ -1001,7 +1058,9 @@ module.exports = class Robot {
           await this.stop();
         }
       } else {
-        if (event.action) {
+        if (event.command) {
+          await this.command(event.command);
+        } else if (event.action) {
           await this.action(event.action);
         } else if (event.move) {
           await this.move(event.move, 0);
@@ -1010,9 +1069,9 @@ module.exports = class Robot {
         } else if (event.moveJoint) {
           await this.moveJoint(event.moveJoint, 0);
         } else if (event.body) {
-          await this.selectBody(event.body);
+          this.selectBody(event.body);
         } else if (event.joint) {
-          await this.selectJoint(event.joint);
+          this.selectJoint(event.joint);
         }
       }
     } catch (err) {
@@ -1029,7 +1088,9 @@ module.exports = class Robot {
       controllerConfig = this.config.controller[name];
       device =
         devices.find((device) => device.product === controllerConfig.product || device.product === name) ||
-        devices.find((device) => !!device.product && device.usagePage === controllerConfig.usagePage && device.usage === controllerConfig.usage);
+        devices.find(
+          (device) => !!device.product && device.usagePage === controllerConfig.usagePage && device.usage === controllerConfig.usage,
+        );
       return device;
     });
 
@@ -1102,7 +1163,9 @@ module.exports = class Robot {
       return result;
     }, {});
     let releaseTimer = null;
-    this.config.keyboard.state = { ...initial };
+    this.keyboard = {
+      key: { ...initial },
+    };
     process.stdin.on("keypress", async (str, key) => {
       if (key.ctrl && key.name === "c") {
         await this.end();
@@ -1112,13 +1175,13 @@ module.exports = class Robot {
         return;
       }
 
-      this.config.keyboard.state = {
+      this.keyboard.key = {
         ...initial,
         [key.name]: 1,
       };
       clearTimeout(releaseTimer);
       releaseTimer = setTimeout(() => {
-        this.config.keyboard.state = { ...initial };
+        this.keyboard.key = { ...initial };
       }, this.config.keyboard.release).unref();
     });
 
@@ -1128,7 +1191,7 @@ module.exports = class Robot {
       current: {},
       previous: {},
     };
-    let keyboardState = this.config.keyboard.state;
+    let keyboardState = this.keyboard.key;
 
     while (true) {
       if (signal?.aborted) {
@@ -1163,8 +1226,8 @@ module.exports = class Robot {
 
       let stop = false;
       if (this.busy()) {
-        for (const name in this.config.keyboard.state) {
-          if (keyboardState[name] === 1 && this.config.keyboard.state[name] === 0) {
+        for (const name in this.keyboard.key) {
+          if (keyboardState[name] === 1 && this.keyboard.key[name] === 0) {
             await this.stop();
             stop = true;
             break;
@@ -1173,16 +1236,15 @@ module.exports = class Robot {
       }
 
       if (!stop) {
-        for (const name in this.config.keyboard.state) {
-          if (keyboardState[name] === 0 && this.config.keyboard.state[name] === 1) {
+        for (const name in this.keyboard.key) {
+          if (keyboardState[name] === 0 && this.keyboard.key[name] === 1) {
             this.#trigger(this.config.keyboard.key[name]);
             break;
           }
         }
       }
 
-      keyboardState = this.config.keyboard.state;
-
+      keyboardState = { ...this.keyboard.key };
       await this.wait(this.config.duration?.input);
     }
   }

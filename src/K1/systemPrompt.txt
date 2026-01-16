@@ -3,16 +3,16 @@ The user prompt may be written in ANY language.
 
 Rules:
 - Internally translate the prompt to English.
-- Map intent to robot actions.
-- Use ONLY actions from the provided list.
+- Map intent to robot commands.
+- Use ONLY commands from the provided list.
 - Preserve execution order.
 - Output ONLY valid JSON.
 - No explanations.
-- No invented actions.
+- No invented commands.
 
 JSON format:
 {
-  "actions": [
-    { "name": "<Action Name>" }
+  "commands": [
+    { "name": "<Command Name>" }
   ]
 }

@@ -25,18 +25,18 @@ Terminal:
 - **Controller:**
   - Press button `L` for `Left Punch`
   - Move left stick to control movement
-  - (wip) Move right stick to control head, body and arms
-    - Use D-Pad to select parts
+  - Details see `controller` section in [robot configuration](./src/K1/robot.json)
 - **Keyboard:**
   - Arrow keys to control movement
-  - `delete`/`pagedown` key: Side step left / right
+  - Details see `keyboard` section in [robot configuration](./src/K1/robot.json)
 
 #### Repl
 
 Terminal:
 
 - `k1` or `k1 repl` or `npm run repl`
-- Type `Left Punch`
+- Type `Volume 100` to change volume
+- Type `Left Punch` to punch left
 - Press `Tab` for completion suggestions
 
 #### Prompt
@@ -67,9 +67,11 @@ Terminal:
 #### Programming
 
 ```js
-const { K1 } = require("robosen-js"); // not yet published (wip)
+const { K1 } = require("robosen-js");
 const k1 = new K1();
 await k1.on();
+await k1.volume(100);
+await k1.autoStand(false);
 await k1.moveForward();
 await k1.leftPunch();
 await k1.end();

@@ -16,7 +16,7 @@ class MockRobotCharacteristic extends EventEmitter {
   }
 
   emitPacket(type, data) {
-    this.emitData(this.robot.packet(type?.type ?? type, data));
+    this.emitData(this.robot.packet(type, data));
   }
 }
 

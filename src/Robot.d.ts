@@ -17,12 +17,12 @@ type PacketType =
     | "07" // MoveWest
     | "08" // MoveNW
     | "09" // RegularMoves
-    | "0A" // Transform
-    | "0B" // HandShake
-    | "0C" // StopMove
-    | "0D" // VoiceControl
-    | "0E" // NoneUsed
-    | "0F" // States
+    | "0a" // Transform
+    | "0b" // HandShake
+    | "0c" // StopMove
+    | "0d" // VoiceControl
+    | "0e" // NoneUsed
+    | "0f" // States
     | "10" // GetUserActionName
     | "11" // GyrosOfforOn
     | "13" // RobotAutoOff
@@ -32,39 +32,39 @@ type PacketType =
     | "17" // FolderActionNameMovesOrActionProgress
     | "18" // GetFolderAudioNames
     | "19" // PlayAudioInFolder
-    | "1A" // SetAutoTurn
-    | "1B" // SetAutoPose
+    | "1a" // SetAutoTurn
+    | "1b" // SetAutoPose
     | "33" // forward
     | "34" // back
     | "36" // fire
     | "37" // Turn_left
     | "38" // Turn_right
     | "39" // shift_left
-    | "3A" // right_shift
-    | "D3" // Eye_lights_are_always_on
-    | "D4" // blinking_eye_lights
-    | "D5" // Excessive_discoloration
-    | "D6" // breathing_light
-    | "D7" // Marquee
-    | "DC" // CreatNewRobotActionFileAndDone
-    | "DD" // DeleteActionByFilePath
-    | "E3" // WriteDataToNewFileAndWriteSuccess
-    | "E6" // InEditor
-    | "E7" // ExitEditor
-    | "E8" // MoveJoint
-    | "E9" // RobotUpJoint
-    | "EA" // UnLockAllJoint
-    | "EB" // LockAllJoint
-    | "EC" // OneJointLockControl
-    | "ED" // JointLockControl
-    | "EE" // PlayAudioControl
-    | "F4" // RobotNormalPos
-    | "F5" // RobotOnUSBMode
-    | "F6" // GetRobotKindName
-    | "F7" // GetRobotVersion
-    | "F8" // GetRobotVersionDate
-    | "FA" // GetFileNameDone / RobotShutDown
-    | "FF" // Failure
+    | "3a" // right_shift
+    | "d3" // Eye_lights_are_always_on
+    | "d4" // blinking_eye_lights
+    | "d5" // Excessive_discoloration
+    | "d6" // breathing_light
+    | "d7" // Marquee
+    | "dc" // CreatNewRobotActionFileAndDone
+    | "dd" // DeleteActionByFilePath
+    | "e3" // WriteDataToNewFileAndWriteSuccess
+    | "e6" // InEditor
+    | "e7" // ExitEditor
+    | "e8" // MoveJoint
+    | "e9" // RobotUpJoint
+    | "ea" // UnLockAllJoint
+    | "eb" // LockAllJoint
+    | "ec" // OneJointLockControl
+    | "ed" // JointLockControl
+    | "ee" // PlayAudioControl
+    | "f4" // RobotNormalPos
+    | "f5" // RobotOnUSBMode
+    | "f6" // GetRobotKindName
+    | "f7" // GetRobotVersion
+    | "f8" // GetRobotVersionDate
+    | "fa" // GetFileNameDone / RobotShutDown
+    | "ff" // Failure
     ;
 
 interface Command {
@@ -154,23 +154,27 @@ export class Robot {
 
     toggle(type: PacketType, value: boolean): Promise<void>;
 
-    toggleAutoStand(value: boolean): Promise<void>;
+    autoStand(value: boolean): Promise<void>;
 
-    toggleAutoOff(value: boolean): Promise<void>;
+    autoOff(value: boolean): Promise<void>;
 
     list(type: PacketType): Promise<string[]>;
 
-    listActionNames(): Promise<string[]>;
+    actionNames(): Promise<string[]>;
 
-    listUserNames(): Promise<string[]>;
+    userNames(): Promise<string[]>;
 
-    listFolderNames(): Promise<string[]>;
+    folderNames(): Promise<string[]>;
 
-    listAudioNames(): Promise<string[]>;
+    audioNames(): Promise<string[]>;
 
-    volume(level: number): Promise<void>;
+    volume(level: number): Promise<number>;
 
-    audio(name: string): Promise<any>;
+    increaseVolume(step: number): Promise<number>;
+
+    decreaseVolume(step: number): Promise<number>;
+
+    audio(name: string): Promise<void>;
 
     move(direction: string, time?: number): Promise<Packet>;
 
@@ -190,7 +194,9 @@ export class Robot {
 
     moveJoint(direction: number, time?: number): Promise<Packet>;
 
-    commands(group: string, name?: string): { [name: string]: Command[] } | Command;
+    commands(name?: string, types?: string[]): { [name: string]: Command[] } | Command;
+
+    command(name: string, types?: string[], limited?: boolean): Promise<Packet>;
 
     actions(name?: string): { [name: string]: Command[] } | Command;
 

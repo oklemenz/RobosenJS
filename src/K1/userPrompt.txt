@@ -1,5 +1,5 @@
 User prompt:
 {{prompt}}
 
-Allowed actions:
-{{actions}}
+Allowed commands:
+{{commands}}
