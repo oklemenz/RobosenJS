@@ -4,7 +4,8 @@ type PacketKind =
     | "progress"
     | "completed"
     | "stop"
-    | "invalid";
+    | "invalid"
+    ;
 
 type PacketType =
     | "00" // InstructMoves
@@ -70,45 +71,13 @@ type PacketType =
 interface Command {
     type: string;
     data?: string | number | boolean | Buffer;
+
+    [key: string]: any;
 }
 
-interface Packet {
-    kind?: PacketKind;
-    type: PacketType;
-    name?: string;
-    data?: string | number;
-    state?: State;
-    bytes?: Buffer;
-    checksum?: string;
-    valid?: boolean;
-    raw?: Buffer;
-
-    toString(): string;
-
-    toLogString(): string;
-}
-
-interface Receive {
-    kind?: PacketKind,
-    type: PacketType,
-    collect?: PacketType,
-    result?: Packet[]
-}
-
-interface State {
-    pattern: number,
-    battery: number,
-    volume: number,
-    progress: number,
-    autoStand: number,
-    autoTurn: number,
-    autoPose: number,
-    autoOff: number
-}
-
-interface Parameters {
+interface Parameters<Packet> {
     command: Command,
-    receive?: Receive,
+    receive?: Receive<Packet>,
     limited?: boolean,
     check?: boolean,
     block?: boolean,
@@ -117,11 +86,19 @@ interface Parameters {
     timeout?: number
 }
 
+interface Receive<Packet> {
+    kind?: PacketKind,
+    type: PacketType,
+    collect?: PacketType,
+    result?: Packet[]
+}
+
 interface RobotOptions {
     [key: string]: any;
 }
 
-export class Robot {
+export class Robot<Packet, State, Joint> {
+
     constructor(name?: string, options?: RobotOptions);
 
     on(): Promise<void>;
@@ -143,6 +120,30 @@ export class Robot {
     stop(): Promise<void>;
 
     shutdown(): Promise<void>;
+
+    initialPosition(norm?: boolean): Promise<Joint>;
+
+    moveJoints(joints: Joint, speed?: number, norm?: boolean): Promise<Joint>;
+
+    moveJointsDelta(deltas: Joint, speed?: number, norm?: boolean): Promise<Joint>;
+
+    moveJointsNorm(joints: Joint, speed?: number): Promise<Joint>;
+
+    moveJoint(name: string, value: number | string, speed?: number): Promise<Joint>;
+
+    headCenter(speed?: number, norm?: boolean): Promise<Joint>;
+
+    headLeft(speed?: number, norm?: boolean): Promise<Joint>;
+
+    headRight(speed?: number, norm?: boolean): Promise<Joint>;
+
+    lockJoint(name: string): Promise<void>;
+
+    unlockJoint(name: string): Promise<void>;
+
+    lockAllJoints(): Promise<void>;
+
+    unlockAllJoints(): Promise<void>;
 
     kind(): Promise<string>;
 
@@ -172,11 +173,19 @@ export class Robot {
 
     audioNames(): Promise<string[]>;
 
-    volume(level: number): Promise<number>;
+    mute(): Promise<Packet>;
+
+    volume(level: number): Promise<Packet>;
 
     increaseVolume(step: number): Promise<number>;
 
     decreaseVolume(step: number): Promise<number>;
+
+    volumeLow(): Promise<Packet>;
+
+    volumeMedium(): Promise<Packet>;
+
+    volumeHigh(): Promise<Packet>;
 
     audio(name: string): Promise<void>;
 
@@ -194,21 +203,17 @@ export class Robot {
 
     moveRight(time?: number): Promise<Packet>;
 
-    moveBody(direction: number, time?: number): Promise<Packet>;
-
-    moveJoint(direction: number, time?: number): Promise<Packet>;
-
     commands(name?: string, types?: string[]): { [name: string]: Command[] } | Command;
-
-    command(name: string, types?: string[], limited?: boolean): Promise<Packet>;
 
     actions(name?: string): { [name: string]: Command[] } | Command;
 
-    action(name: string, limited?: boolean): Promise<Packet>;
+    command(name: string, args?: any[], types?: string[], limited?: boolean): Promise<Packet>;
 
-    perform({command, receive, limited, check, block, wait, measure, timeout}: Parameters): Promise<Packet>;
+    action(name: string, args?: any[], limited?: boolean): Promise<Packet>;
 
-    call(command: Command, receive?: Receive, measure?: boolean, timeout?: number): Promise<Packet>;
+    perform({command, receive, limited, check, block, wait, measure, timeout}: Parameters<Packet>): Promise<Packet>;
+
+    call(command: Command, receive?: Receive<Packet>, measure?: boolean, timeout?: number): Promise<Packet>;
 
     send(command: Command | string | Buffer): Promise<any>;
 
@@ -229,6 +234,8 @@ export class Robot {
     selectBody(body: string);
 
     selectJoint(joint: string);
+
+    controlSelection(value: number, time?: number): Promise<Packet>;
 
     repl(): void;
 

@@ -7,10 +7,12 @@
     "k1": "bin/k1.js"
   },
   "scripts": {
+    "k1": "k1",
     "test": "jest .",
     "start": "node scripts/main",
     "control": "node scripts/control",
     "main": "node scripts/main",
+    "program": "node scripts/program",
     "prompt": "node scripts/prompt",
     "repl": "node scripts/repl",
     "voice": "node scripts/voice",

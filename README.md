@@ -15,20 +15,36 @@ Terminal:
 
 - `k1`
 - Type `Left Punch`
-- Press `Tab` for completion suggestions
+- Type `Initial Position`
+
+Press `Tab` for completion suggestions
 
 #### Control
 
 Terminal:
 
 - `k1 control` or `npm run control`
+
 - **Controller:**
   - Press button `L` for `Left Punch`
   - Move left stick to control movement
-  - Details see `controller` section in [robot configuration](./src/K1/robot.json)
+  - Use DPad to select body parts:
+    - `up`: Head
+    - `right`: Right Arm
+    - `left`: Left Arm
+    - `down`: None (move)
+  - Control body parts with `left`/`right` stick
+
 - **Keyboard:**
-  - Arrow keys to control movement
-  - Details see `keyboard` section in [robot configuration](./src/K1/robot.json)
+  - Use arrow keys to control movement
+  - Use `delete`/`pagedown` for side steps
+  - Use `WASD` to select body parts:
+    - `w`: Head
+    - `a`: Left Arm
+    - `s`: None (move)
+    - `d`: Right Arm
+
+Details see `controller` and `keyboard` section in [K1/robot.json](src/K1/robot.json).
 
 #### Repl
 
@@ -37,6 +53,10 @@ Terminal:
 - `k1` or `k1 repl` or `npm run repl`
 - Type `Volume 100` to change volume
 - Type `Left Punch` to punch left
+- Type `Left Arm +30%` to move
+  - `number`: absolute value based movement
+  - `+/-`: relative value based movement
+  - `%`: percentage based movement (0-100%)
 - Press `Tab` for completion suggestions
 
 #### Prompt

@@ -1,4 +1,4 @@
-import {Packet, Robot} from "./Robot";
+import {PacketKind, PacketType, Robot} from "./Robot";
 
 type MoveDirection =
     | "Move Forward"
@@ -76,50 +76,145 @@ type ActionName =
     | "Tilt Left"
     | "Tilt Right"
     | "Wave Hands"
-    | "Yield";
+    | "Yield"
+    ;
 
 type BodyName =
-    | "None"
-    | "Head"
-    | "Left Arm"
-    | "Right Arm"
-    | "Torso";
+    | "head"
+    | "leftArm"
+    | "rightArm"
+    | "leftLeg"
+    | "rightLeg"
+    ;
 
 type JointName =
-    | "None"
-    | "Head"
-    | "Left Shoulder"
-    | "Right Shoulder"
-    | "Left Arm"
-    | "Right Arm"
-    | "Left Hand"
-    | "Right Hand"
-    | "Left Hip"
-    | "Right Hip"
-    | "Left Thigh"
-    | "Right Thigh"
-    | "Left Calf"
-    | "Right Calf"
-    | "Left Ankle"
-    | "Right Ankle"
-    | "Left Foot"
-    | "Right Foot";
+    | "leftThigh"
+    | "leftCalf"
+    | "leftAnkle"
+    | "rightThigh"
+    | "rightCalf"
+    | "rightAnkle"
+    | "leftShoulder"
+    | "rightShoulder"
+    | "leftHip"
+    | "leftFoot"
+    | "rightHip"
+    | "rightFoot"
+    | "leftArm"
+    | "leftHand"
+    | "rightArm"
+    | "rightHand"
+    | "head"
+    ;
 
+interface Packet {
+    kind?: PacketKind;
+    type: PacketType;
+    name?: string;
+    data?: string | number;
+    state?: State;
+    joint?: Joint;
+    bytes?: Buffer;
+    checksum?: string;
+    valid?: boolean;
+    raw?: Buffer;
+
+    toString(): string;
+
+    toLogString(): string;
+}
+
+interface State {
+    pattern?: number,
+    battery?: number,
+    volume?: number,
+    progress?: number,
+    autoStand?: number,
+    autoTurn?: number,
+    autoPose?: number,
+    autoOff?: number
+}
+
+interface Joint {
+    leftThigh?: number,
+    leftCalf?: number,
+    leftAnkle?: number,
+    rightThigh?: number,
+    rightCalf?: number,
+    rightAnkle?: number,
+    leftShoulder?: number,
+    rightShoulder?: number,
+    leftHip?: number,
+    leftFoot?: number,
+    rightHip?: number,
+    rightFoot?: number,
+    leftArm?: number,
+    leftHand?: number,
+    rightArm?: number,
+    rightHand?: number,
+    head?: number,
+    value17?: number,
+    value18?: number,
+    value19?: number,
+    value20?: number,
+    value21?: number,
+    value22?: number,
+    value23?: number,
+    speed?: number
+}
 
 interface K1Options {
     [key: string]: any;
 }
 
-export class K1 extends Robot {
+export class K1 extends Robot<Packet, State, Joint> {
     constructor(options?: K1Options)
 
     move(direction: MoveDirection, time?: number): Promise<Packet>;
 
-    action(name: ActionName, limited?: boolean): Promise<Packet>;
+    action(name: ActionName, args?: any[], limited?: boolean): Promise<Packet>;
 
-    selectBody(body: BodyName): void;
+    moveJoint(name: JointName, value: number | string, speed?: number): Promise<Joint>;
 
-    selectJoint(joint: JointName): void;
+    lockJoint(name: JointName): Promise<void>;
+
+    unlockJoint(name: JointName): Promise<void>;
+
+    selectBody(body?: BodyName): void;
+
+    selectJoint(joint?: JointName): void;
+
+    leftThigh(value?: number | string, speed?: number): Promise<Joint>
+
+    leftCalf(value?: number | string, speed?: number): Promise<Joint>
+
+    leftAnkle(value?: number | string, speed?: number): Promise<Joint>
+
+    rightThigh(value?: number | string, speed?: number): Promise<Joint>
+
+    rightCalf(value?: number | string, speed?: number): Promise<Joint>
+
+    rightAnkle(value?: number | string, speed?: number): Promise<Joint>
+
+    leftShoulder(value?: number | string, speed?: number): Promise<Joint>
+
+    rightShoulder(value?: number | string, speed?: number): Promise<Joint>
+
+    leftHip(value?: number | string, speed?: number): Promise<Joint>
+
+    leftFoot(value?: number | string, speed?: number): Promise<Joint>
+
+    rightHip(value?: number | string, speed?: number): Promise<Joint>
+
+    rightFoot(value?: number | string, speed?: number): Promise<Joint>
+
+    leftArm(value?: number | string, speed?: number): Promise<Joint>
+
+    leftHand(value?: number | string, speed?: number): Promise<Joint>
+
+    rightArm(value?: number | string, speed?: number): Promise<Joint>
+
+    rightHand(value?: number | string, speed?: number): Promise<Joint>
 
     artificialIntelligence(): Promise<Packet>;
 

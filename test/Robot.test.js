@@ -310,5 +310,27 @@ describe("Robot", () => {
       expect(packet.data).toBe(100);
       expect(k1.ready()).toBe(true);
     });
+
+    test("Initial Position", async () => {});
+
+    test("Joint", async () => {});
+
+    test("Joint Delta", async () => {});
+
+    test("Joint Norm", async () => {});
+
+    test("Head Center", async () => {});
+
+    test("Head Left", async () => {});
+
+    test("Head Right", async () => {});
+
+    test("Lock Joint", async () => {});
+
+    test("Unlock Joint", async () => {});
+
+    test("Lock all Joint", async () => {});
+
+    test("Unlock all Joint", async () => {});
   });
 });
