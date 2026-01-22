@@ -12,5 +12,5 @@ const { K1 } = require("../");
   await k1.headRight();
   await k1.headCenter();
   await k1.leftHand("+40%", 30);
-  await k1.rightHand(0, 30);
+  await k1.rightHand(50, 30);
 })();

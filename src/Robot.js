@@ -10,7 +10,6 @@ const readlinePromise = require("readline/promises");
 const hid = require("node-hid");
 const noble = require("@abandonware/noble");
 const recorder = require("node-record-lpcm16");
-const OpenAI = require("openai");
 
 process.loadEnvFile(".env");
 
@@ -54,8 +53,9 @@ module.exports = class Robot {
       spec: {},
       log: {
         active: true,
-        level: LOG_LEVEL.verbose,
+        level: "verbose",
       },
+      constant: {},
       duration: {},
       state: {},
       type: {},
@@ -67,14 +67,18 @@ module.exports = class Robot {
       recording: {},
       controller: {},
       keyboard: {},
+      control: {},
     };
-    this.config = { ...this.config, ...this.#loadConfig(options), ...options };
+    this.#merge(options, this.config);
+    this.#merge(this.#loadConfig(options), options);
+    this.#merge(options, this.config);
     this.code = this.config.code ?? code;
     this.name = this.config.name ?? this.code;
     this.status = STATUS.INITIAL;
     this.selectedBody = undefined;
     this.selectedJoint = undefined;
     this.#link();
+    this.#setup();
   }
 
   #loadConfig(options) {
@@ -82,15 +86,34 @@ module.exports = class Robot {
     fileName += !fileName.endsWith(".json") ? ".json" : "";
     const filePath = path.join(this.folder, fileName);
     try {
-      const config = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(config);
+      if (fs.existsSync(filePath)) {
+        const config = fs.readFileSync(filePath, "utf8");
+        return JSON.parse(config);
+      }
+      this.logInfo("No configuration found at", filePath);
     } catch (error) {
-      this.logError("Cannot load configuration at", filePath, error.message ?? error);
+      this.logError("Failed to load configuration at", filePath, error.message ?? error);
     }
   }
 
   #link() {
-    this.#propagate();
+    for (const section in this.config) {
+      const sectionConfig = this.config[section];
+      if (this.#isObject(sectionConfig)) {
+        for (const name in sectionConfig) {
+          const entry = sectionConfig[name];
+          if (this.#isObject(entry)) {
+            entry.name ??= name;
+            for (const name in entry) {
+              const subEntry = entry[name];
+              if (this.#isObject(subEntry)) {
+                subEntry.name ??= name;
+              }
+            }
+          }
+        }
+      }
+    }
     for (const group in this.config.command) {
       const groupConfig = this.config.command[group];
       if (!groupConfig.group) {
@@ -119,30 +142,25 @@ module.exports = class Robot {
       }
     }
     for (const command of Object.values(this.commands())) {
-      const functionName = this.#toCamelCase(command.name);
-      this[functionName] ??= async (...args) => {
+      const constantName = this.#toCamelCase(command.name);
+      this.config.constant[constantName] ??= command.name;
+      this[constantName] ??= async (...args) => {
         return await this.command(command.name, args);
       };
     }
+  }
+
+  #setup() {
     this.jointsInitial = Object.values(this.config.joint).reduce((result, joint) => {
       result[joint.name] = joint.value;
       return result;
     }, {});
     this.jointsCurrent = { ...this.jointsInitial };
-  }
-
-  #propagate() {
-    for (const section in this.config) {
-      const sectionConfig = this.config[section];
-      if (this.#isObject(sectionConfig)) {
-        for (const name in sectionConfig) {
-          const entry = sectionConfig[name];
-          if (this.#isObject(entry)) {
-            entry.name ??= name;
-          }
-        }
-      }
-    }
+    this.locksInitial = Object.values(this.config.joint).reduce((result, joint) => {
+      result[joint.name] = 0;
+      return result;
+    }, {});
+    this.locksCurrent = { ...this.locksInitial };
   }
 
   async on() {
@@ -293,128 +311,178 @@ module.exports = class Robot {
       return false;
     }
     this.logVerbose("Initial position ...");
-    return await this.moveJoints(this.jointsInitial, this.config.command["Initial Position"]?.speed ?? 40, norm);
+    const command = this.config.command.System[this.config.constant.initialPosition];
+    return await this.moveJoints(this.jointsInitial, command?.speed, norm);
   }
 
-  async moveJoints(joints, speed, norm = false) {
-    joints = { ...this.jointsCurrent, ...joints };
-    joints.speed = speed ?? 30;
-    Object.keys(joints).forEach((name) => {
-      if (isNaN(joints[name])) {
-        joints[name] = this.jointsCurrent[name] ?? this.config.joint[name].value;
-      }
-      joints[name] = Math.min(Math.max(joints[name], this.config.joint[name].min), this.config.joint[name].max);
-    }, {});
-    await this.call({
-      type: this.config.type.jointMove,
-      data: joints,
-    });
-    this.jointsCurrent = { ...joints };
-    if (norm) {
-      Object.keys(this.config.joint).forEach((name) => {
-        const jointConfig = this.config.joint[name];
-        if (jointConfig.norm !== false) {
-          joints[name] -= jointConfig.value;
-        }
-      });
-    }
-    return joints;
-  }
-
-  async moveJointsDelta(deltas, speed, norm = false) {
-    const joints = { ...this.jointsCurrent };
-    Object.keys(deltas).forEach((name) => {
-      joints[name] += deltas?.[name] ?? 0;
-    }, {});
-    return await this.moveJoints(joints, speed, norm);
-  }
-
-  async moveJointsNorm(joints, speed) {
-    joints = { ...joints };
-    Object.keys(this.config.joint).forEach((name) => {
-      const jointConfig = this.config.joint[name];
-      if (jointConfig.norm !== false) {
-        joints[name] += jointConfig.value;
-      }
-    });
-    return await this.moveJoints(joints, speed, true);
-  }
-
-  async moveJoint(name, value, speed) {
-    const joint = this.config.joint[name];
-    if (!joint) {
-      return;
-    }
-    let move = false;
-    const joints = {};
+  #normalizeJointValue(joint, value) {
+    const currentValue = this.jointsCurrent[joint.name] ?? joint.value;
     if (this.#isSetString(value)) {
       if (value.endsWith("%")) {
         value = value.trim().slice(0, -1);
         if (value.startsWith("+") || value.startsWith("-")) {
           const percent = Math.min(Math.max(parseInt(value), -100), 100);
-          joints[joint.name] = (this.jointsCurrent[joint.name] ?? joint.value) + (percent / 100) * (joint.max - joint.min);
+          value = currentValue + (percent / 100) * (joint.max - joint.min);
         } else {
           const percent = Math.min(Math.max(parseInt(value), 0), 100);
-          joints[joint.name] = joint.min + (percent / 100) * (joint.max - joint.min);
+          value = joint.min + (percent / 100) * (joint.max - joint.min);
         }
-        move = true;
       } else {
-        joints[joint.name] = (this.jointsCurrent[joint.name] ?? joint.value) + parseInt(value);
-        move = true;
+        value = currentValue + parseInt(value);
       }
     } else {
       if (value < 0) {
-        joints[joint.name] = (this.jointsCurrent[joint.name] ?? joint.value) + value;
-        move = true;
+        value = currentValue + value;
       } else {
-        joints[joint.name] = value ?? joint.value;
-        move = true;
+        value = value ?? currentValue;
       }
     }
-    if (move) {
-      return await this.moveJoints(joints, speed);
+    if (isNaN(value)) {
+      value = currentValue;
     }
+    value = Math.min(Math.max(value, joint.min), joint.max);
+    return value;
+  }
+
+  async moveJoint(name, value, speed, norm = false) {
+    name = name?.name ?? name;
+    const joint = this.config.joint[name];
+    if (!joint) {
+      return;
+    }
+    return await this.moveJoints(
+      {
+        [joint.name]: value,
+      },
+      speed,
+      norm,
+    );
+  }
+
+  async moveJoints(joints, speed, norm = false) {
+    joints.speed = speed ? speed : joints.speed;
+    const jointsData = Object.keys(this.config.joint).reduce((result, name) => {
+      result[name] = this.#normalizeJointValue(this.config.joint[name], joints[name]);
+      return result;
+    }, {});
+    await this.call({
+      type: this.config.type.jointMove,
+      data: jointsData,
+    });
+    this.jointsCurrent = { ...jointsData };
+    if (norm) {
+      Object.keys(this.config.joint).forEach((name) => {
+        const jointConfig = this.config.joint[name];
+        if (jointConfig.norm !== false) {
+          jointsData[name] -= jointConfig.value;
+        }
+      });
+    }
+    await this.wait(this.config.duration?.jointDelay);
+    return jointsData;
+  }
+
+  async moveJointsDelta(deltas, speed, norm = false) {
+    const joints = Object.keys(deltas).reduce(
+      (result, name) => {
+        const value = parseInt(deltas?.[name] ?? 0);
+        result[name] += !isNaN(value) ? value : 0;
+        return result;
+      },
+      { ...this.jointsCurrent },
+    );
+    return await this.moveJoints(joints, speed, norm);
+  }
+
+  async moveJointsNorm(joints, speed) {
+    joints = Object.values(this.config.joint).reduce(
+      (result, joint) => {
+        if (joint.norm !== false) {
+          result[joint.name] += joint.value;
+        }
+        return result;
+      },
+      { ...joints },
+    );
+    return await this.moveJoints(joints, speed, true);
   }
 
   async headCenter(speed, norm = false) {
-    const command = this.config.command.Joint["Head Center"];
-    const joints = { ...this.jointsCurrent };
-    joints[this.config.joint.head.name] = this.config.joint.head.value;
-    return await this.moveJoints(joints, speed ?? command?.speed, norm);
+    const command = this.config.command.Joint[this.config.constant.headCenter];
+    const joint = this.config.joint.head;
+    return await this.moveJoint(joint, joint.value, speed ?? command?.speed, norm);
   }
 
   async headLeft(speed, norm = false) {
-    const command = this.config.command.Joint["Head Left"];
-    const joints = { ...this.jointsCurrent };
-    joints[this.config.joint.head.name] = this.config.joint.head.min;
-    return await this.moveJoints(joints, speed ?? command?.speed, norm);
+    const command = this.config.command.Joint[this.config.constant.headLeft];
+    const joint = this.config.joint.head;
+    return await this.moveJoint(joint, joint.min, speed ?? command?.speed, norm);
   }
 
   async headRight(speed, norm = false) {
-    const command = this.config.command.Joint["Head Right"];
-    const joints = { ...this.jointsCurrent };
-    joints[this.config.joint.head.name] = this.config.joint.head.max;
-    return await this.moveJoints(joints, speed ?? command?.speed, norm);
+    const command = this.config.command.Joint[this.config.constant.headRight];
+    const joint = this.config.joint.head;
+    return await this.moveJoint(joint, joint.max, speed ?? command?.speed, norm);
   }
 
-  async lockJoint(joint) {
-    // TODO: Implement
+  async lockJoint(name) {
+    name = name?.name ?? name;
+    return await this.lockJoints({
+      [name]: 1,
+    });
   }
 
-  async unlockJoint(joint) {
-    // TODO: Implement
+  async lockJoints(joints) {
+    const jointsData = Object.values(this.config.joint).reduce((result, joint) => {
+      result[joint.name] = this.#isSet(joints[joint.name]) ? (joints[joint.name] ? 1 : 0) : (this.locksCurrent[joint.name] ?? 0);
+      return result;
+    }, {});
+    await this.call({
+      type: this.config.type.jointLock,
+      data: jointsData,
+    });
+    this.locksCurrent = { ...jointsData };
+    await this.wait(this.config.duration?.lockDelay);
+    return jointsData;
   }
 
   async lockAllJoints() {
-    // TODO: Implement
+    await this.call({
+      type: this.config.type.jointLockAll,
+    });
+    this.locksCurrent = Object.values(this.config.joint).reduce((result, joint) => {
+      result[joint.name] = 1;
+      return result;
+    }, {});
+    await this.wait(this.config.duration?.lockDelay);
+    return this.locksCurrent;
+  }
+
+  async unlockJoint(name) {
+    name = name?.name ?? name;
+    return await this.unlockJoints({
+      [name]: 0,
+    });
+  }
+
+  async unlockJoints(joints) {
+    return await this.lockJoints(joints);
   }
 
   async unlockAllJoints() {
-    // TODO: Implement
+    await this.call({
+      type: this.config.type.jointUnlockAll,
+    });
+    this.locksCurrent = Object.values(this.config.joint).reduce((result, joint) => {
+      result[joint.name] = 0;
+      return result;
+    }, {});
+    await this.wait(this.config.duration?.lockDelay);
+    return this.locksCurrent;
   }
 
+  // TODO: Check?
   async program() {
-    // TODO: Implement
     if (!this.#checkConnected()) {
       return false;
     }
@@ -428,14 +496,13 @@ module.exports = class Robot {
       },
     );
     if (packet?.joint) {
-      this.jointsCurrent = { ...packet.joint };
+      this.jointsCurrent = packet.joint;
     }
     return this.jointsCurrent;
   }
 
+  // TODO: Check?
   async jointSync() {
-    // TODO: Implement
-    // Record into a buffer ?
     if (!this.#checkConnected()) {
       return false;
     }
@@ -582,14 +649,14 @@ module.exports = class Robot {
   }
 
   async increaseVolume(step) {
-    const command = this.config.command["Increase Volume"];
+    const command = this.config.command.Sound[this.config.constant.increaseVolume];
     const state = await this.state();
     const level = (state.volume ?? this.config.type.volume.data) + (step ?? command?.data ?? 20);
     return await this.volume(level);
   }
 
   async decreaseVolume(step) {
-    const command = this.config.command["Decrease Volume"];
+    const command = this.config.command.Sound[this.config.constant.decreaseVolume];
     const state = await this.state();
     const level = (state.volume ?? this.config.type.volume.data) - (step ?? command?.data ?? 20);
     return await this.volume(level);
@@ -759,7 +826,7 @@ module.exports = class Robot {
   }
 
   async action(name, args = undefined, limited = false) {
-    return this.command(name, args, [this.config.type.action], limited);
+    return await this.command(name, args, [this.config.type.action], limited);
   }
 
   async perform({ command, receive = {}, limited = false, check = true, block = true, wait = true, measure = true, timeout }) {
@@ -892,7 +959,7 @@ module.exports = class Robot {
       return { kind: PACKET.INVALID, raw: buffer };
     }
     const hex = buffer.toString("hex");
-    if (!hex.startsWith(this.config.spec.header) || hex.length < 10) {
+    if (this.config.spec.header?.length !== 4 || !hex.startsWith(this.config.spec.header) || hex.length < 10) {
       return { kind: PACKET.INVALID, raw: buffer };
     }
     const numBytes = parseInt(hex.slice(4, 6), 16);
@@ -902,7 +969,7 @@ module.exports = class Robot {
     const checksum = hex.slice(-2);
     let kind = PACKET.DATA;
     const bytes = Buffer.from(data, "hex");
-    let value = "";
+    let value = data;
     const typeConfig = this.#typeConfig(type);
     if (bytes.length === 1) {
       value = parseInt(data, 16);
@@ -922,6 +989,8 @@ module.exports = class Robot {
     return {
       kind,
       type,
+      header: this.config.spec.header,
+      length: bytes.length,
       name,
       data: value,
       ...(struct ? { [typeConfig.value]: struct } : {}),
@@ -933,7 +1002,7 @@ module.exports = class Robot {
         return hex;
       },
       toLogString: () => {
-        return `<packet kind=${kind} type=${type} (${name}) data=${JSON.stringify(struct) ?? value ?? bytes.toString("hex")}>`;
+        return `<packet kind=${kind} type=${type} (${name}) data=${JSON.stringify(struct) ?? value}>`;
       },
     };
   }
@@ -1023,40 +1092,47 @@ module.exports = class Robot {
     if (data.input === "controller") {
       for (const name of Object.keys(data.value)) {
         const control = data.value[name];
-        const joint =
-          this.selectedJoint ??
-          Object.values(this.config.joint).find(
-            (joint) =>
-              joint.body === this.selectedBody?.name &&
-              joint.control === name &&
-              ((joint.axis === "x" && control.x !== 0) || (joint.axis === "y" && control.y !== 0)),
-          );
-        if (joint) {
-          joints[joint.name] =
-            control.x < 0 || control.y < 0 ? (!joint.inverse ? joint.min : joint.max) : !joint.inverse ? joint.max : joint.min;
+        const matchedConfigs = this.selectedJoint
+          ? this.config.control.joint[this.selectedJoint.name]
+          : Object.values(this.config.control.joint).filter(
+              (joint) =>
+                joint.body === this.selectedBody?.name &&
+                joint.control === name &&
+                ((joint.axis === "x" && control.x !== 0) || (joint.axis === "y" && control.y !== 0)),
+            );
+        for (const config of matchedConfigs) {
+          const step = config.step ?? this.config.control.step;
+          if (control.x > 0 || control.y > 0) {
+            joints[config.name] += step * (config.inverse ? -1 : 1);
+          } else if (control.x < 0 || control.y < 0) {
+            joints[config.name] -= step * (config.inverse ? -1 : 1);
+          } else {
+            joints[config.name] = this.config.joint[config.name].value;
+          }
           move = true;
         }
       }
     } else if (data.input === "keyboard") {
-      const joint =
-        this.selectedJoint ??
-        Object.values(this.config.joint)
-          .filter((joint) => joint.body === this.selectedBody?.name && joint.key)
-          .find((joint) => {
-            return joint.key.split("/").includes(data.key);
-          });
-      if (joint) {
-        const keys = joint.key.split("/");
-        if (keys.length > 2) {
-          joints[joint.name] = keys.indexOf(data.key) === 0 ? joint.min : keys.indexOf(data.key) === 1 ? joint.value : joint.max;
+      const matchedConfigs = this.selectedJoint
+        ? this.config.control.joint[this.selectedJoint.name]
+        : Object.values(this.config.control.joint).filter(
+            (joint) => joint.body === this.selectedBody?.name && joint.key && joint.key.split("/").includes(data.key),
+          );
+      for (const config of matchedConfigs) {
+        const step = config.step ?? this.config.control.step;
+        const keys = config.key.split("/");
+        if (keys.indexOf(data.key) === 0) {
+          joints[config.name] -= step;
+        } else if (keys.indexOf(data.key) === keys.length - 1) {
+          joints[config.name] += step;
         } else {
-          joints[joint.name] = keys.indexOf(data.key) === 0 ? joint.min : joint.max;
+          joints[config.name] = this.config.joint[config.name].value;
         }
         move = true;
       }
     }
     if (move) {
-      return await this.moveJoints(joints, source.speed);
+      return await this.moveJoints(joints, source.speed ?? this.config.control.speed);
     }
   }
 
@@ -1185,17 +1261,18 @@ module.exports = class Robot {
     const stream = Readable.from(buffer);
     stream.path = "prompt.wav";
     this.logInfo("Transcribing ...");
-    const transcription = await this.#llm().openai.audio.transcriptions.create({
+    const llm = this.#llm();
+    const transcription = await llm.transcribe({
       file: stream,
-      model: this.config.llm.voice,
+      model: llm.config.model.voice,
     });
-    this.logInfo("Recognized:", transcription.text);
+    this.logInfo("Recognized:", transcription);
 
     if (signal?.aborted) {
       return;
     }
 
-    return await this.prompt(transcription.text);
+    return await this.prompt(transcription);
   }
 
   async voiceRepl() {
@@ -1253,7 +1330,7 @@ module.exports = class Robot {
   async prompt(prompt) {
     const llm = this.#llm();
     const commands = Object.values(this.commands());
-    const userPrompt = llm.userPrompt
+    const userPrompt = llm.command.userPrompt
       .replace("{{prompt}}", prompt)
       .replace(
         "{{commands}}",
@@ -1261,17 +1338,15 @@ module.exports = class Robot {
           .map((command) => `- ${command.name} (description: ${command.description ?? ""}, duration: ${command.duration ?? "?"} ms)`)
           .join("\n"),
       );
-    const response = await llm.openai.chat.completions.create({
-      model: this.config.llm.default,
+    const response = await llm.complete({
+      model: llm.config.model.default,
       temperature: 0,
       messages: [
-        { role: "system", content: llm.systemPrompt },
+        { role: "system", content: llm.command.systemPrompt },
         { role: "user", content: userPrompt },
       ],
     });
-    const responseMessage = response.choices[0].message.content;
-    const responseObject = JSON.parse(responseMessage);
-    const selectedCommands = responseObject.commands.filter((responseCommand) =>
+    const selectedCommands = response.commands.filter((responseCommand) =>
       commands.find((command) => command.name === responseCommand.name),
     );
     if (selectedCommands.length) {
@@ -1306,13 +1381,34 @@ module.exports = class Robot {
   }
 
   #llm() {
-    return (this._llm ??= {
-      openai: new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      }),
-      systemPrompt: fs.readFileSync(path.join(this.folder, this.config.llm.systemPrompt), "utf-8"),
-      userPrompt: fs.readFileSync(path.join(this.folder, this.config.llm.userPrompt), "utf-8"),
-    });
+    if (["openai"].includes(this.config.llm.provider?.toLowerString())) {
+      const OpenAI = require("openai");
+      const openai = new OpenAI({
+        apiKey: process.env[this.config.llm.env],
+      });
+      this._llm ??= {
+        complete: async (...args) => {
+          const response = await openai.chat.completions.create(...args);
+          return JSON.parse(response.choices[0].message.content);
+        },
+        transcribe: async (...args) => {
+          const transcription = await openai.audio.transcriptions.create(...args);
+          return transcription.text;
+        },
+      };
+    }
+    if (this._llm) {
+      this._llm.config ??= this.config.llm;
+      this._llm.command ??= {
+        systemPrompt: this.#readFile(this.config.llm.command.systemPrompt),
+        userPrompt: this.#readFile(this.config.llm.command.userPrompt),
+      };
+      this._llm.joint ??= {
+        systemPrompt: this.#readFile(this.config.llm.joint.systemPrompt),
+        userPrompt: this.#readFile(this.config.llm.joint.userPrompt),
+      };
+    }
+    return this._llm;
   }
 
   async #trigger(event, data) {
@@ -1534,7 +1630,7 @@ module.exports = class Robot {
 
       keyboardState = { ...this.keyboard.key };
 
-      await this.wait(this.config.duration?.input);
+      await this.wait(this.config.control.input);
     }
   }
 
@@ -1595,5 +1691,27 @@ module.exports = class Robot {
 
   #isSetString(value) {
     return typeof value === "string" && this.#isSet(value);
+  }
+
+  #merge(data, into) {
+    if (!this.#isObject(data)) {
+      return into;
+    }
+    for (const key of Object.keys(data)) {
+      if (this.#isObject(into[key]) && this.#isObject(data[key])) {
+        into[key] = this.#merge(data[key], into[key]);
+      } else {
+        into[key] = data[key];
+      }
+    }
+    return into;
+  }
+
+  #readFile(file) {
+    const filePath = path.join(this.folder, file);
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath, "utf-8");
+    }
+    return "";
   }
 };

@@ -15,6 +15,7 @@
     "indent": "- ",
     "mark": "# "
   },
+  "constant": {},
   "duration": {
     "announcement": 3500,
     "warmup": 0,
@@ -22,7 +23,8 @@
     "timeout": 5000,
     "buffer": 500,
     "stop": 1000,
-    "input": 50
+    "jointDelay": 50,
+    "lockDelay": 50
   },
   "state": {
     "pattern": { "index": 0 },
@@ -68,7 +70,7 @@
     "jointUnlockAll": { "code": "ea" },
     "jointLockAll": { "code": "eb" },
     "jointLockOne": { "code": "ec" },
-    "jointLock": { "code": "ed" },
+    "jointLock": { "code": "ed", "value": "joint", "struct": true },
     "kind": { "code": "f6", "value": "string" },
     "version": { "code": "f7", "value": "string" },
     "date": { "code": "f8", "value": "string" },
@@ -84,86 +86,23 @@
     "rightLeg": {}
   },
   "joint": {
-    "leftThigh": { "index": 0, "value": 129, "min": 40, "max": 200, "body": "leftLeg", "axis": "y" },
-    "leftCalf": { "index": 1, "value": 60, "min": 40, "max": 200, "body": "leftLeg", "axis": "y" },
-    "leftAnkle": { "index": 2, "value": 106, "min": 40, "max": 200, "body": "leftLeg", "axis": "y" },
-    "rightThigh": { "index": 3, "value": 118, "min": 40, "max": 200, "body": "rightLeg", "axis": "y" },
-    "rightCalf": { "index": 4, "value": 190, "min": 40, "max": 200, "body": "rightLeg", "axis": "y" },
-    "rightAnkle": { "index": 5, "value": 146, "min": 40, "max": 200, "body": "rightLeg", "axis": "y" },
-    "leftShoulder": {
-      "index": 6,
-      "value": 212,
-      "min": 22,
-      "max": 242,
-      "body": "leftArm",
-      "axis": "y",
-      "control": "LeftStick",
-      "key": "up/down"
-    },
-    "rightShoulder": {
-      "index": 7,
-      "value": 36,
-      "min": 6,
-      "max": 226,
-      "body": "rightArm",
-      "axis": "y",
-      "control": "LeftStick",
-      "key": "down/up"
-    },
-    "leftHip": { "index": 8, "value": 123, "min": 40, "max": 200, "body": "leftLeg", "axis": "x" },
-    "leftFoot": { "index": 9, "value": 123, "min": 40, "max": 200, "body": "leftLeg", "axis": "x" },
-    "rightHip": { "index": 10, "value": 129, "min": 40, "max": 200, "body": "rightLeg", "axis": "x" },
-    "rightFoot": { "index": 11, "value": 115, "min": 40, "max": 200, "body": "rightLeg", "axis": "x" },
-    "leftArm": {
-      "index": 12,
-      "value": 223,
-      "min": 40,
-      "max": 200,
-      "body": "leftArm",
-      "axis": "x",
-      "control": "RightStick",
-      "key": "right/left"
-    },
-    "leftHand": {
-      "index": 13,
-      "value": 116,
-      "min": 40,
-      "max": 200,
-      "body": "leftArm",
-      "axis": "y",
-      "control": "RightStick",
-      "key": "home/end"
-    },
-    "rightArm": {
-      "index": 14,
-      "value": 34,
-      "min": 40,
-      "max": 200,
-      "body": "rightArm",
-      "axis": "x",
-      "control": "RightStick",
-      "key": "right/left"
-    },
-    "rightHand": {
-      "index": 15,
-      "value": 126,
-      "min": 40,
-      "max": 200,
-      "body": "rightArm",
-      "axis": "y",
-      "control": "RightStick",
-      "key": "end/home"
-    },
-    "head": {
-      "index": 16,
-      "value": 122,
-      "min": 42,
-      "max": 202,
-      "body": "head",
-      "axis": "x",
-      "control": "RightStick",
-      "key": "left/space/right"
-    },
+    "leftThigh": { "index": 0, "value": 129, "min": 40, "max": 200, "body": "leftLeg" },
+    "leftCalf": { "index": 1, "value": 60, "min": 40, "max": 200, "body": "leftLeg" },
+    "leftAnkle": { "index": 2, "value": 106, "min": 40, "max": 200, "body": "leftLeg" },
+    "rightThigh": { "index": 3, "value": 118, "min": 40, "max": 200, "body": "rightLeg" },
+    "rightCalf": { "index": 4, "value": 190, "min": 40, "max": 200, "body": "rightLeg" },
+    "rightAnkle": { "index": 5, "value": 146, "min": 40, "max": 200, "body": "rightLeg" },
+    "leftShoulder": { "index": 6, "value": 212, "min": 22, "max": 242, "body": "leftArm" },
+    "rightShoulder": { "index": 7, "value": 36, "min": 6, "max": 226, "body": "rightArm" },
+    "leftHip": { "index": 8, "value": 123, "min": 40, "max": 200, "body": "leftLeg" },
+    "leftFoot": { "index": 9, "value": 123, "min": 40, "max": 200, "body": "leftLeg" },
+    "rightHip": { "index": 10, "value": 129, "min": 40, "max": 200, "body": "rightLeg" },
+    "rightFoot": { "index": 11, "value": 115, "min": 40, "max": 200, "body": "rightLeg" },
+    "leftArm": { "index": 12, "value": 223, "min": 40, "max": 223, "body": "leftArm" },
+    "leftHand": { "index": 13, "value": 116, "min": 40, "max": 200, "body": "leftArm" },
+    "rightArm": { "index": 14, "value": 34, "min": 34, "max": 200, "body": "rightArm" },
+    "rightHand": { "index": 15, "value": 126, "min": 40, "max": 200, "body": "rightArm" },
+    "head": { "index": 16, "value": 122, "min": 42, "max": 202, "body": "head" },
     "value17": { "index": 17, "value": 125, "min": 40, "max": 200 },
     "value18": { "index": 18, "value": 125, "min": 40, "max": 200 },
     "value19": { "index": 19, "value": 125, "min": 40, "max": 200 },
@@ -188,8 +127,8 @@
       "Handshake": { "type": "0b", "timeout": 2000 },
       "Initial Position": { "func": "initialPosition", "speed": 40, "description": "stand" },
       "Stop": { "type": "0c", "timeout": 2000 },
-      "Shutdown": { "type": "fa", "receive": "none", "description": "off", "status": 0 },
-      "Exit": { "type": "fa", "receive": "none", "description": "see you", "end": true }
+      "Shutdown": { "type": "fa", "receive": "none", "description": "see you", "status": 0 },
+      "Off": { "type": "fa", "receive": "none", "description": "end", "end": true }
     },
     "Info": {
       "group": true,
@@ -433,10 +372,20 @@
     }
   },
   "llm": {
-    "default": "gpt-4.1-mini",
-    "voice": "gpt-4o-mini-transcribe",
-    "systemPrompt": "systemPrompt.txt",
-    "userPrompt": "userPrompt.txt"
+    "provider": "openai",
+    "env": "OPENAI_API_KEY",
+    "model": {
+      "default": "gpt-4.1-mini",
+      "voice": "gpt-4o-mini-transcribe"
+    },
+    "command": {
+      "systemPrompt": "llm/command/systemPrompt.txt",
+      "userPrompt": "llm/command/userPrompt.txt"
+    },
+    "joint": {
+      "systemPrompt": "llm/joint/systemPrompt.txt",
+      "userPrompt": "llm/joint/userPrompt.txt"
+    }
   },
   "recording": {
     "warmup": 0,
@@ -508,9 +457,6 @@
           "x=-1,y=-1": {},
           "x=1,y=-1": {}
         }
-      },
-      "control": {
-        "speed": 40
       }
     }
   },
@@ -531,9 +477,30 @@
       "a": { "body": "leftArm" },
       "s": { "body": null },
       "d": { "body": "rightArm" }
-    },
-    "control": {
-      "speed": 40
+    }
+  },
+  "control": {
+    "input": 50,
+    "speed": 30,
+    "step": 40,
+    "joint": {
+      "leftThigh": { "body": "leftLeg", "axis": "y" },
+      "leftCalf": { "body": "leftLeg", "axis": "y" },
+      "leftAnkle": { "body": "leftLeg", "axis": "y" },
+      "rightThigh": { "body": "rightLeg", "axis": "y" },
+      "rightCalf": { "body": "rightLeg", "axis": "y" },
+      "rightAnkle": { "body": "rightLeg", "axis": "y" },
+      "leftShoulder": { "body": "leftArm", "axis": "y", "control": "LeftStick", "key": "up/space/down" },
+      "rightShoulder": { "body": "rightArm", "axis": "y", "control": "LeftStick", "key": "down/space/up" },
+      "leftHip": { "body": "leftLeg", "axis": "x" },
+      "leftFoot": { "body": "leftLeg", "axis": "x" },
+      "rightHip": { "body": "rightLeg", "axis": "x" },
+      "rightFoot": { "body": "rightLeg", "axis": "x" },
+      "leftArm": { "body": "leftArm", "axis": "x", "control": "RightStick", "key": "right/space/left" },
+      "leftHand": { "body": "leftArm", "axis": "y", "control": "RightStick", "key": "home/space/end" },
+      "rightArm": { "body": "rightArm", "axis": "x", "control": "RightStick", "key": "right/space/left" },
+      "rightHand": { "body": "rightArm", "axis": "y", "control": "RightStick", "key": "end/space/home" },
+      "head": { "body": "head", "axis": "x", "control": "RightStick", "key": "left/space/right" }
     }
   }
 }

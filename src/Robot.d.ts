@@ -101,6 +101,8 @@ export class Robot<Packet, State, Joint> {
 
     constructor(name?: string, options?: RobotOptions);
 
+    config: RobotConfig;
+
     on(): Promise<void>;
 
     off(end?: boolean): Promise<void>;
@@ -123,13 +125,13 @@ export class Robot<Packet, State, Joint> {
 
     initialPosition(norm?: boolean): Promise<Joint>;
 
+    moveJoint(name: string, value: number | string, speed?: number, norm?: boolean): Promise<Joint>;
+
     moveJoints(joints: Joint, speed?: number, norm?: boolean): Promise<Joint>;
 
     moveJointsDelta(deltas: Joint, speed?: number, norm?: boolean): Promise<Joint>;
 
     moveJointsNorm(joints: Joint, speed?: number): Promise<Joint>;
-
-    moveJoint(name: string, value: number | string, speed?: number): Promise<Joint>;
 
     headCenter(speed?: number, norm?: boolean): Promise<Joint>;
 
@@ -137,13 +139,17 @@ export class Robot<Packet, State, Joint> {
 
     headRight(speed?: number, norm?: boolean): Promise<Joint>;
 
-    lockJoint(name: string): Promise<void>;
+    lockJoint(name: string): Promise<Joint>;
 
-    unlockJoint(name: string): Promise<void>;
+    lockJoints(joints: Joint): Promise<Joint>;
 
-    lockAllJoints(): Promise<void>;
+    lockAllJoints(): Promise<Joint>;
 
-    unlockAllJoints(): Promise<void>;
+    unlockJoint(name: string): Promise<Joint>;
+
+    unlockJoints(joints: Joint): Promise<Joint>;
+
+    unlockAllJoints(): Promise<Joint>;
 
     kind(): Promise<string>;
 
@@ -261,3 +267,222 @@ export class Robot<Packet, State, Joint> {
 
     logVerbose(...args: any[]): void;
 }
+
+export interface RobotConfig {
+    code: string;
+    name: string;
+    spec: SpecConfig;
+    log: LogConfig;
+    constant: Record<string, string>;
+    duration: DurationConfig;
+    state: Record<string, StateEntry>;
+    type: Record<string, TypeEntry>;
+    body: Record<string, BodyEntry>;
+    joint: Record<string, JointConfig>;
+    direction: Record<string, string>;
+    command: CommandConfig;
+    llm: LLMConfig;
+    recording: RecordingConfig;
+    controller: ControllerConfig;
+    keyboard: KeyboardConfig;
+    control: ControlConfig;
+}
+
+export interface SpecConfig {
+    manufacturerUuid: string;
+    serviceUuid: string;
+    characteristicsUuid: string;
+    header: string;
+}
+
+export interface LogConfig {
+    active: boolean;
+    traffic: boolean;
+    level: "verbose" | "info" | "warn" | "error";
+    prompt: string;
+    indent: string;
+    mark: string;
+}
+
+export interface DurationConfig {
+    announcement: number;
+    warmup: number;
+    cooldown: number;
+    timeout: number;
+    buffer: number;
+    stop: number;
+    jointDelay: number;
+    lockDelay: number;
+}
+
+export interface StateEntry {
+    index: number;
+}
+
+export interface TypeEntry {
+    code: string;
+    alt?: string;
+    data?: number | string | boolean;
+    value?: "string" | "state" | "joint";
+    min?: number;
+    max?: number;
+    move?: boolean;
+    toggle?: boolean;
+    list?: boolean;
+    struct?: boolean;
+    progress?: boolean;
+}
+
+export interface BodyEntry {
+    name: string;
+}
+
+export interface JointConfig {
+    index: number;
+    value: number;
+    min: number;
+    max: number;
+    body?: string;
+    norm?: boolean;
+}
+
+export interface CommandEntry {
+    name?: string;
+    group?: string;
+    kind?: number | string;
+    type?: string;
+    func?: string;
+    data?: unknown;
+    timeout?: number;
+    duration?: number;
+    speed?: number;
+    step?: number;
+    parameter?: boolean;
+    receive?: PacketKind;
+    description?: string;
+    status?: number;
+    end?: boolean;
+    stop?: boolean;
+    check?: boolean;
+    pro?: boolean;
+}
+
+export interface CommandGroup {
+    group: true;
+    block?: boolean;
+    derive?: boolean;
+    receive?: PacketKind;
+    type?: string;
+    func?: string;
+    speed?: number;
+    timeout?: number;
+    parameter?: boolean;
+    data?: unknown;
+    min?: number;
+    max?: number;
+    time?: number;
+
+    [commandName: string]: CommandEntry | boolean | string | number | undefined;
+}
+
+export interface CommandConfig {
+    [groupName: string]: CommandGroup;
+}
+
+export interface LLMConfig {
+    provider: string;
+    env: string;
+    model: {
+        default: string;
+        voice: string;
+    };
+    command: PromptConfig;
+    joint: PromptConfig;
+}
+
+export interface PromptConfig {
+    systemPrompt: string;
+    userPrompt: string;
+}
+
+export interface RecordingConfig {
+    warmup: number;
+    minDuration: number;
+    maxDuration: number;
+    stopOnSilence: boolean;
+    silenceDuration: number;
+    silenceThreshold: number;
+    voice: {
+        sampleRate: number;
+        frameMs: number;
+        rmsThreshold: number;
+        minVoicedMs: number;
+    };
+}
+
+export interface ControllerConfig {
+    [controllerName: string]: GameController;
+}
+
+export interface GameController {
+    vendorId: number;
+    productId: number;
+    product: string;
+    usagePage: number;
+    usage: number;
+    deadZone: number;
+    button: Record<string, ButtonBinding>;
+    axis: Record<string, AxisBinding>;
+    stick: Record<string, StickMapping>;
+}
+
+export interface ButtonBinding {
+    index: number;
+    value: number;
+    command?: string;
+    body?: string | null;
+}
+
+export interface AxisBinding {
+    index: number;
+    bias: number;
+    stick: string;
+    direction: "x" | "y";
+}
+
+export type StickMapping = Record<
+    `${"x" | "y"}=${-1 | 0 | 1},${"y"}=${-1 | 0 | 1}`,
+    {
+        move?: string;
+        stop?: boolean;
+    }
+>;
+
+export interface KeyboardConfig {
+    release: number;
+    key: Record<
+        string,
+        {
+            move?: string;
+            stop?: boolean;
+            body?: string | null;
+        }
+    >;
+}
+
+export interface ControlConfig {
+    input: number;
+    speed: number;
+    step: number;
+
+    joint: Record<
+        string,
+        {
+            body: string;
+            axis: "x" | "y";
+            control?: string;
+            key?: string;
+        }
+    >;
+}
+

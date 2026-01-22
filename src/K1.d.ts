@@ -111,10 +111,12 @@ interface Packet {
     kind?: PacketKind;
     type: PacketType;
     name?: string;
+    header?: string;
     data?: string | number;
     state?: State;
     joint?: Joint;
     bytes?: Buffer;
+    length?: number;
     checksum?: string;
     valid?: boolean;
     raw?: Buffer;
@@ -136,30 +138,30 @@ interface State {
 }
 
 interface Joint {
-    leftThigh?: number,
-    leftCalf?: number,
-    leftAnkle?: number,
-    rightThigh?: number,
-    rightCalf?: number,
-    rightAnkle?: number,
-    leftShoulder?: number,
-    rightShoulder?: number,
-    leftHip?: number,
-    leftFoot?: number,
-    rightHip?: number,
-    rightFoot?: number,
-    leftArm?: number,
-    leftHand?: number,
-    rightArm?: number,
-    rightHand?: number,
-    head?: number,
-    value17?: number,
-    value18?: number,
-    value19?: number,
-    value20?: number,
-    value21?: number,
-    value22?: number,
-    value23?: number,
+    leftThigh?: number | string,
+    leftCalf?: number | string,
+    leftAnkle?: number | string,
+    rightThigh?: number | string,
+    rightCalf?: number | string,
+    rightAnkle?: number | string,
+    leftShoulder?: number | string,
+    rightShoulder?: number | string,
+    leftHip?: number | string,
+    leftFoot?: number | string,
+    rightHip?: number | string,
+    rightFoot?: number | string,
+    leftArm?: number | string,
+    leftHand?: number | string,
+    rightArm?: number | string,
+    rightHand?: number | string,
+    head?: number | string,
+    value17?: number | string,
+    value18?: number | string,
+    value19?: number | string,
+    value20?: number | string,
+    value21?: number | string,
+    value22?: number | string,
+    value23?: number | string,
     speed?: number
 }
 
@@ -176,9 +178,9 @@ export class K1 extends Robot<Packet, State, Joint> {
 
     moveJoint(name: JointName, value: number | string, speed?: number): Promise<Joint>;
 
-    lockJoint(name: JointName): Promise<void>;
+    lockJoint(name: JointName): Promise<Joint>;
 
-    unlockJoint(name: JointName): Promise<void>;
+    unlockJoint(name: JointName): Promise<Joint>
 
     selectBody(body?: BodyName): void;
 

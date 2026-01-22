@@ -27,24 +27,30 @@ Terminal:
 
 - **Controller:**
   - Press button `L` for `Left Punch`
-  - Move left stick to control movement
-  - Use DPad to select body parts:
-    - `up`: Head
-    - `right`: Right Arm
-    - `left`: Left Arm
-    - `down`: None (move)
-  - Control body parts with `left`/`right` stick
+  - Move Robot:
+    - Move left stick to control movement
+  - Move Joints:
+    - Use DPad to select body parts:
+      - `up`: Head
+      - `right`: Right Arm
+      - `left`: Left Arm
+      - `down`: None (-> Move Robot)
+    - Control body parts with `left`/`right` stick
 
 - **Keyboard:**
-  - Use arrow keys to control movement
-  - Use `delete`/`pagedown` for side steps
-  - Use `WASD` to select body parts:
-    - `w`: Head
-    - `a`: Left Arm
-    - `s`: None (move)
-    - `d`: Right Arm
+  - Move Robot:
+    - Use arrow keys to control movement
+    - Use `delete`/`pagedown` for side steps
+  - Move Joints:
+    - Use `WASD` to select body parts:
+      - `w`: Head
+      - `a`: Left Arm
+      - `s`: None (-> Move Robot)
+      - `d`: Right Arm
+    - Use arrow keys to control movement
+    - Use `space` to reset position
 
-Details see `controller` and `keyboard` section in [K1/robot.json](src/K1/robot.json).
+Details see `controller`, `keyboard` and `control` section in [K1/robot.json](src/K1/robot.json).
 
 #### Repl
 
