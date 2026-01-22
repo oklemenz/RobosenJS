@@ -23,8 +23,7 @@
     "timeout": 5000,
     "buffer": 500,
     "stop": 1000,
-    "jointDelay": 50,
-    "lockDelay": 50
+    "delay": 50
   },
   "state": {
     "pattern": { "index": 0 },
@@ -497,9 +496,9 @@
       "rightHip": { "body": "rightLeg", "axis": "x" },
       "rightFoot": { "body": "rightLeg", "axis": "x" },
       "leftArm": { "body": "leftArm", "axis": "x", "control": "RightStick", "key": "right/space/left" },
-      "leftHand": { "body": "leftArm", "axis": "y", "control": "RightStick", "key": "home/space/end" },
+      "leftHand": { "body": "leftArm", "axis": "y", "control": "RightStick", "key": "end/space/home" },
       "rightArm": { "body": "rightArm", "axis": "x", "control": "RightStick", "key": "right/space/left" },
-      "rightHand": { "body": "rightArm", "axis": "y", "control": "RightStick", "key": "end/space/home" },
+      "rightHand": { "body": "rightArm", "axis": "y", "control": "RightStick", "key": "home/space/end" },
       "head": { "body": "head", "axis": "x", "control": "RightStick", "key": "left/space/right" }
     }
   }

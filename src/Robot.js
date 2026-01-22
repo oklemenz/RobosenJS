@@ -365,9 +365,12 @@ module.exports = class Robot {
       result[name] = this.#normalizeJointValue(this.config.joint[name], joints[name]);
       return result;
     }, {});
-    await this.call({
-      type: this.config.type.jointMove,
-      data: jointsData,
+    await this.perform({
+      command: {
+        type: this.config.type.jointMove,
+        data: jointsData,
+      },
+      wait: false,
     });
     this.jointsCurrent = { ...jointsData };
     if (norm) {
@@ -378,7 +381,7 @@ module.exports = class Robot {
         }
       });
     }
-    await this.wait(this.config.duration?.jointDelay);
+    await this.wait(this.config.duration?.delay);
     return jointsData;
   }
 
@@ -442,7 +445,7 @@ module.exports = class Robot {
       data: jointsData,
     });
     this.locksCurrent = { ...jointsData };
-    await this.wait(this.config.duration?.lockDelay);
+    await this.wait(this.config.duration?.delay);
     return jointsData;
   }
 
@@ -454,7 +457,7 @@ module.exports = class Robot {
       result[joint.name] = 1;
       return result;
     }, {});
-    await this.wait(this.config.duration?.lockDelay);
+    await this.wait(this.config.duration?.delay);
     return this.locksCurrent;
   }
 
@@ -477,7 +480,7 @@ module.exports = class Robot {
       result[joint.name] = 0;
       return result;
     }, {});
-    await this.wait(this.config.duration?.lockDelay);
+    await this.wait(this.config.duration?.delay);
     return this.locksCurrent;
   }
 
@@ -889,10 +892,10 @@ module.exports = class Robot {
       const elapsedMs = performance.now() - start;
       this.logVerbose(this.config.log?.indent + "Elapsed", `${elapsedMs.toFixed(0)} ms`);
     }
-    if (wait) {
-      await this.wait(this.config.duration?.cooldown);
-      if (block && command.block !== false && (timedLimited || received)) {
-        this.status = STATUS.READY;
+    if (block && command.block !== false && (timedLimited || received)) {
+      this.status = STATUS.READY;
+      if (wait) {
+        await this.wait(this.config.duration?.cooldown);
       }
     }
     if (this.#isSet(command.status)) {
@@ -1092,7 +1095,7 @@ module.exports = class Robot {
     if (data.input === "controller") {
       for (const name of Object.keys(data.value)) {
         const control = data.value[name];
-        const matchedConfigs = this.selectedJoint
+        const controlJoints = this.selectedJoint
           ? this.config.control.joint[this.selectedJoint.name]
           : Object.values(this.config.control.joint).filter(
               (joint) =>
@@ -1100,33 +1103,33 @@ module.exports = class Robot {
                 joint.control === name &&
                 ((joint.axis === "x" && control.x !== 0) || (joint.axis === "y" && control.y !== 0)),
             );
-        for (const config of matchedConfigs) {
-          const step = config.step ?? this.config.control.step;
-          if (control.x > 0 || control.y > 0) {
-            joints[config.name] += step * (config.inverse ? -1 : 1);
-          } else if (control.x < 0 || control.y < 0) {
-            joints[config.name] -= step * (config.inverse ? -1 : 1);
+        for (const joint of controlJoints) {
+          const step = joint.step ?? this.config.control.step;
+          if ((joint.axis === "x" && control.x > 0) || (joint.axis === "y" && control.y > 0)) {
+            joints[joint.name] += step * (joint.inverse ? -1 : 1);
+          } else if ((joint.axis === "x" && control.x < 0) || (joint.axis === "y" && control.y < 0)) {
+            joints[joint.name] -= step * (joint.inverse ? -1 : 1);
           } else {
-            joints[config.name] = this.config.joint[config.name].value;
+            joints[joint.name] = this.config.joint[joint.name].value;
           }
           move = true;
         }
       }
     } else if (data.input === "keyboard") {
-      const matchedConfigs = this.selectedJoint
+      const controlJoints = this.selectedJoint
         ? this.config.control.joint[this.selectedJoint.name]
         : Object.values(this.config.control.joint).filter(
             (joint) => joint.body === this.selectedBody?.name && joint.key && joint.key.split("/").includes(data.key),
           );
-      for (const config of matchedConfigs) {
-        const step = config.step ?? this.config.control.step;
-        const keys = config.key.split("/");
+      for (const joint of controlJoints) {
+        const step = joint.step ?? this.config.control.step;
+        const keys = joint.key.split("/");
         if (keys.indexOf(data.key) === 0) {
-          joints[config.name] -= step;
+          joints[joint.name] -= step;
         } else if (keys.indexOf(data.key) === keys.length - 1) {
-          joints[config.name] += step;
+          joints[joint.name] += step;
         } else {
-          joints[config.name] = this.config.joint[config.name].value;
+          joints[joint.name] = this.config.joint[joint.name].value;
         }
         move = true;
       }
@@ -1381,7 +1384,7 @@ module.exports = class Robot {
   }
 
   #llm() {
-    if (["openai"].includes(this.config.llm.provider?.toLowerString())) {
+    if (["openai"].includes(this.config.llm.provider?.toLowerCase())) {
       const OpenAI = require("openai");
       const openai = new OpenAI({
         apiKey: process.env[this.config.llm.env],
