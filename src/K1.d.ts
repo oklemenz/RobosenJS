@@ -218,6 +218,76 @@ export class K1 extends Robot<Packet, State, Joint> {
 
     rightHand(value?: number | string, speed?: number): Promise<Joint>
 
+    head(value?: number | string, speed?: number): Promise<Joint>
+
+    lockLeftThigh(): Promise<Joint>
+
+    lockLeftCalf(): Promise<Joint>
+
+    lockLeftAnkle(): Promise<Joint>
+
+    lockRightThigh(): Promise<Joint>
+
+    lockRightCalf(): Promise<Joint>
+
+    lockRightAnkle(): Promise<Joint>
+
+    lockLeftShoulder(): Promise<Joint>
+
+    lockRightShoulder(): Promise<Joint>
+
+    lockLeftHip(): Promise<Joint>
+
+    lockLeftFoot(): Promise<Joint>
+
+    lockRightHip(): Promise<Joint>
+
+    lockRightFoot(): Promise<Joint>
+
+    lockLeftArm(): Promise<Joint>
+
+    lockLeftHand(): Promise<Joint>
+
+    lockRightArm(): Promise<Joint>
+
+    lockRightHand(): Promise<Joint>
+
+    lockHead(): Promise<Joint>
+
+    unlockLeftThigh(): Promise<Joint>
+
+    unlockLeftCalf(): Promise<Joint>
+
+    unlockLeftAnkle(): Promise<Joint>
+
+    unlockRightThigh(): Promise<Joint>
+
+    unlockRightCalf(): Promise<Joint>
+
+    unlockRightAnkle(): Promise<Joint>
+
+    unlockLeftShoulder(): Promise<Joint>
+
+    unlockRightShoulder(): Promise<Joint>
+
+    unlockLeftHip(): Promise<Joint>
+
+    unlockLeftFoot(): Promise<Joint>
+
+    unlockRightHip(): Promise<Joint>
+
+    unlockRightFoot(): Promise<Joint>
+
+    unlockLeftArm(): Promise<Joint>
+
+    unlockLeftHand(): Promise<Joint>
+
+    unlockRightArm(): Promise<Joint>
+
+    unlockRightHand(): Promise<Joint>
+
+    unlockHead(): Promise<Joint>
+
     artificialIntelligence(): Promise<Packet>;
 
     boogaloo(): Promise<Packet>;

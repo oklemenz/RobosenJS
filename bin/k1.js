@@ -2,12 +2,20 @@
 "use strict";
 
 const { K1 } = require("../");
+const demo = require("../scripts/demo");
 
 (async function main() {
   const k1 = new K1();
   await k1.on();
   const cmd = (process.argv.slice(2)?.[0] ?? "").toLowerCase();
   switch (cmd) {
+    case "d":
+    case "demo":
+      await demo.main(k1);
+      break;
+    case "code":
+      await demo.code(k1);
+      break;
     case "p":
     case "prompt":
     case "ai":
@@ -34,4 +42,5 @@ const { K1 } = require("../");
       await k1.repl();
       break;
   }
+  await k1.end();
 })();

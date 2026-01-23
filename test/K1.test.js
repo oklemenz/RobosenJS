@@ -116,16 +116,8 @@ describe("K1", () => {
       rightArm: 0,
       rightHand: 1,
       head: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
-      speed: 0,
     });
-    expect(packet).toBe("ffff1bed0001000100010001000100010001000100010001000100010014");
+    expect(packet).toBe("ffff13ed000100010001000100010001000100010008");
     packet = k1.packetString(k1.config.type.jointLock, {
       head: 0,
       leftAnkle: 0,
@@ -144,16 +136,8 @@ describe("K1", () => {
       rightHip: 0,
       rightShoulder: 1,
       rightThigh: 1,
-      speed: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
     });
-    expect(packet).toBe("ffff1bed0001000100010001000100010001000100010001000100010014");
+    expect(packet).toBe("ffff13ed000100010001000100010001000100010008");
   });
 
   test("parse pro action packet", () => {
@@ -409,14 +393,14 @@ describe("K1", () => {
   });
 
   test("parse lock packet", () => {
-    let packetString = k1.packetString(k1.config.type.jointLock, Buffer.from("00010001000100010001000100010001000100010001000100", "hex"));
-    expect(packetString).toBe("ffff1bed0001000100010001000100010001000100010001000100010014");
+    let packetString = k1.packetString(k1.config.type.jointLock, Buffer.from("0001000100010001000100010001000100", "hex"));
+    expect(packetString).toBe("ffff13ed000100010001000100010001000100010008");
     let packet = k1.parsePacketString(packetString);
     expect(packet).toMatchObject({
       kind: "data",
       type: "ed",
       name: "jointLock",
-      length: 25,
+      length: 17,
       joint: {
         leftThigh: 0,
         leftCalf: 1,
@@ -435,22 +419,14 @@ describe("K1", () => {
         rightArm: 0,
         rightHand: 1,
         head: 0,
-        value17: 1,
-        value18: 0,
-        value19: 1,
-        value20: 0,
-        value21: 1,
-        value22: 0,
-        value23: 1,
-        speed: 0,
       },
-      checksum: "14",
+      checksum: "08",
       valid: true,
       raw: Buffer.from(packetString, "hex"),
     });
     // Lock Head
-    packetString = k1.packetString(k1.config.type.jointLock, Buffer.from("00010001000100010001000100010001010100010001000100", "hex"));
-    expect(packetString).toBe("ffff1bed0001000100010001000100010001000101010001000100010015");
+    packetString = k1.packetString(k1.config.type.jointLock, Buffer.from("0001000100010001000100010001000101", "hex"));
+    expect(packetString).toBe("ffff13ed000100010001000100010001000100010109");
     packet = k1.parsePacketString(packetString);
     expect(packet).toMatchObject({
       kind: "data",
@@ -474,16 +450,8 @@ describe("K1", () => {
         rightArm: 0,
         rightHand: 1,
         head: 1,
-        value17: 1,
-        value18: 0,
-        value19: 1,
-        value20: 0,
-        value21: 1,
-        value22: 0,
-        value23: 1,
-        speed: 0,
       },
-      checksum: "15",
+      checksum: "09",
       valid: true,
       raw: Buffer.from(packetString, "hex"),
     });

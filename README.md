@@ -100,6 +100,10 @@ await k1.volume(100);
 await k1.autoStand(false);
 await k1.moveForward();
 await k1.leftPunch();
+await k1.headLeft();
+await k1.leftHand("+40%", 30);
+await k1.audio("AppSysMS/101");
+await k1.wait(3000);
 await k1.end();
 ```
 

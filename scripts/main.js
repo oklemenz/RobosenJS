@@ -1,21 +1,11 @@
 "use strict";
 
 const { K1 } = require("../");
+const demo = require("../scripts/demo");
 
 (async function main() {
   const k1 = new K1();
   await k1.on();
-  await k1.handshake();
-  await k1.version();
-  await k1.date();
-  await k1.userNames();
-  await k1.volume(130);
-  await k1.autoOff(true);
-  await k1.autoStand(false);
-  await k1.state();
-  await k1.moveForward();
-  await k1.turnRight();
-  await k1.leftPunch();
-  await k1.rightPunch();
+  await demo.main(k1);
   await k1.end();
 })();

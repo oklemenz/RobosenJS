@@ -51,6 +51,7 @@ class MockRobotNoble extends EventEmitter {
   async test(robot) {
     this.robot = robot;
     this.robot.config.log.level = "error";
+    this.robot.config.log.traffic = false;
     this.robot.config.duration = {};
     this.peripheral = new MockRobotPeripheral(this.robot);
     const onPromise = this.robot.on();

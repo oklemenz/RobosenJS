@@ -78,7 +78,7 @@ interface Command {
 interface Parameters<Packet> {
     command: Command,
     receive?: Receive<Packet>,
-    limited?: boolean,
+    limit?: boolean | number,
     check?: boolean,
     block?: boolean,
     wait?: boolean,
@@ -89,7 +89,7 @@ interface Parameters<Packet> {
 interface Receive<Packet> {
     kind?: PacketKind,
     type: PacketType,
-    collect?: PacketType,
+    collectType?: PacketType,
     result?: Packet[]
 }
 
@@ -109,6 +109,8 @@ export class Robot<Packet, State, Joint> {
 
     end(): Promise<void>;
 
+    exit(): void;
+
     connected(): boolean;
 
     ready(): boolean;
@@ -125,7 +127,7 @@ export class Robot<Packet, State, Joint> {
 
     initialPosition(norm?: boolean): Promise<Joint>;
 
-    moveJoint(name: string, value: number | string, speed?: number, norm?: boolean): Promise<Joint>;
+    moveJoint(name: string, value?: number | string, speed?: number, norm?: boolean): Promise<Joint>;
 
     moveJoints(joints: Joint, speed?: number, norm?: boolean): Promise<Joint>;
 
@@ -195,6 +197,8 @@ export class Robot<Packet, State, Joint> {
 
     audio(name: string): Promise<void>;
 
+    play(number: number): Promise<void>;
+
     move(direction: string, time?: number): Promise<Packet>;
 
     moveForward(time?: number): Promise<Packet>;
@@ -213,11 +217,11 @@ export class Robot<Packet, State, Joint> {
 
     actions(name?: string): { [name: string]: Command[] } | Command;
 
-    command(name: string, args?: any[], types?: string[], limited?: boolean): Promise<Packet>;
+    command(name: string, args?: any[], types?: string[], limit?: boolean | number): Promise<Packet>;
 
-    action(name: string, args?: any[], limited?: boolean): Promise<Packet>;
+    action(name: string, args?: any[], limit?: boolean | number): Promise<Packet>;
 
-    perform({command, receive, limited, check, block, wait, measure, timeout}: Parameters<Packet>): Promise<Packet>;
+    perform({command, receive, limit, check, block, wait, measure, timeout}: Parameters<Packet>): Promise<Packet>;
 
     call(command: Command, receive?: Receive<Packet>, measure?: boolean, timeout?: number): Promise<Packet>;
 
@@ -241,9 +245,7 @@ export class Robot<Packet, State, Joint> {
 
     selectJoint(joint: string);
 
-    controlSelection(value: number, time?: number): Promise<Packet>;
-
-    repl(): void;
+    repl(): Promise<void>;
 
     voice(signal?: AbortSignal): Promise<void>;
 
@@ -251,7 +253,7 @@ export class Robot<Packet, State, Joint> {
 
     prompt(prompt: string): Promise<void>;
 
-    promptRepl(): void;
+    promptRepl(): Promise<void>;
 
     control(signal?: AbortSignal): Promise<void>;
 
@@ -272,20 +274,22 @@ export interface RobotConfig {
     code: string;
     name: string;
     spec: SpecConfig;
-    log: LogConfig;
-    constant: Record<string, string>;
-    duration: DurationConfig;
-    state: Record<string, StateEntry>;
-    type: Record<string, TypeEntry>;
-    body: Record<string, BodyEntry>;
+    log?: LogConfig;
+    constant?: Record<string, string>;
+    duration?: DurationConfig;
+    state: Record<string, StateConfig>;
+    type: Record<string, TypeConfig>;
+    body: Record<string, BodyConfig>;
     joint: Record<string, JointConfig>;
+    command: Record<string, CommandGroupConfig | CommandConfig>;
     direction: Record<string, string>;
-    command: CommandConfig;
-    llm: LLMConfig;
-    recording: RecordingConfig;
-    controller: ControllerConfig;
-    keyboard: KeyboardConfig;
-    control: ControlConfig;
+    llm?: LLMConfig;
+    recording?: RecordingConfig;
+    controller?: ControllerConfig;
+    keyboard?: KeyboardConfig;
+    control?: ControlConfig;
+    audio?: AudioConfig;
+    voice?: VoiceConfig;
 }
 
 export interface SpecConfig {
@@ -296,12 +300,12 @@ export interface SpecConfig {
 }
 
 export interface LogConfig {
-    active: boolean;
-    traffic: boolean;
-    level: "verbose" | "info" | "warn" | "error";
-    prompt: string;
-    indent: string;
-    mark: string;
+    active?: boolean;
+    traffic?: boolean;
+    level?: "verbose" | "info" | "warn" | "error";
+    prompt?: string;
+    indent?: string;
+    mark?: string;
 }
 
 export interface DurationConfig {
@@ -315,15 +319,15 @@ export interface DurationConfig {
     lockDelay: number;
 }
 
-export interface StateEntry {
+export interface StateConfig {
     index: number;
 }
 
-export interface TypeEntry {
+export interface TypeConfig {
     code: string;
     alt?: string;
     data?: number | string | boolean;
-    value?: "string" | "state" | "joint";
+    value?: "string" | "number" | "boolean" | "state" | "joint";
     min?: number;
     max?: number;
     move?: boolean;
@@ -331,9 +335,10 @@ export interface TypeEntry {
     list?: boolean;
     struct?: boolean;
     progress?: boolean;
+    length?: number;
 }
 
-export interface BodyEntry {
+export interface BodyConfig {
     name: string;
 }
 
@@ -346,47 +351,40 @@ export interface JointConfig {
     norm?: boolean;
 }
 
-export interface CommandEntry {
-    name?: string;
-    group?: string;
+export interface CommandCommon {
     kind?: number | string;
     type?: string;
+    description?: string;
     func?: string;
-    data?: unknown;
+    data?: string | number | boolean;
+    min?: number;
+    max?: number;
+    time?: number;
     timeout?: number;
     duration?: number;
     speed?: number;
     step?: number;
     parameter?: boolean;
-    receive?: PacketKind;
-    description?: string;
+    receiveKind?: PacketKind;
+    receiveType?: PacketType;
     status?: number;
     end?: boolean;
     stop?: boolean;
-    check?: boolean;
-    pro?: boolean;
-}
-
-export interface CommandGroup {
-    group: true;
     block?: boolean;
-    derive?: boolean;
-    receive?: PacketKind;
-    type?: string;
-    func?: string;
-    speed?: number;
-    timeout?: number;
-    parameter?: boolean;
-    data?: unknown;
-    min?: number;
-    max?: number;
-    time?: number;
-
-    [commandName: string]: CommandEntry | boolean | string | number | undefined;
+    check?: boolean;
+    example?: string;
 }
 
-export interface CommandConfig {
-    [groupName: string]: CommandGroup;
+export interface CommandConfig extends CommandCommon {
+    name?: string;
+    group?: string;
+}
+
+export interface CommandGroupConfig extends CommandCommon {
+    group: true;
+    derive?: boolean;
+
+    [name: string]: CommandConfig | boolean | string | number | undefined;
 }
 
 export interface LLMConfig {
@@ -486,3 +484,24 @@ export interface ControlConfig {
     >;
 }
 
+export interface AudioConfig {
+    [namespace: string]: {
+        program?: {
+            range: {
+                start: number;
+                end: number;
+            };
+        };
+        joint?: {
+            range: {
+                start: number;
+                end: number;
+            };
+        };
+    };
+}
+
+export interface VoiceConfig {
+    name: string;
+    pro?: boolean;
+}

@@ -132,6 +132,34 @@ describe("Robot", () => {
     expect(packet.data).toBe(40);
   });
 
+  test("Audio", async () => {
+    const audioCall = noble.mock(async () => {});
+    const promise = k1.audio("AppSysMS/101");
+    expect(k1.busy()).toBe(false);
+    const result = await promise;
+    expect(audioCall).toHaveBeenCalledTimes(1);
+    expect(result).toBeUndefined();
+    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const packet = k1.parsePacket(buffer);
+    expect(packet.data).toBe("AppSysMS/101");
+    expect(k1.ready()).toBe(true);
+  });
+
+  test("Play", async () => {
+    const playCall = noble.mock(async () => {
+      noble.notify(k1.config.type.play, "ee", 5);
+    });
+    const promise = k1.play(101);
+    expect(k1.busy()).toBe(false);
+    const result = await promise;
+    expect(playCall).toHaveBeenCalledTimes(1);
+    expect(result).toBeUndefined();
+    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const packet = k1.parsePacket(buffer);
+    expect(packet.data).toBe(101);
+    expect(k1.ready()).toBe(true);
+  });
+
   test("List Action Names", async () => {
     const call = noble.mock(async () => {
       noble.notify(k1.config.type.actionNames, "Left Punch", 5);
@@ -274,7 +302,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.moveForward(10);
+    k1.config.command.Move[k1.config.constant.moveForward].min = 0;
+    const promise = k1.moveForward(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -298,7 +327,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.moveBackward(10);
+    k1.config.command.Move[k1.config.constant.moveBackward].min = 0;
+    const promise = k1.moveBackward(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -322,7 +352,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.turnLeft(10);
+    k1.config.command.Move[k1.config.constant.turnLeft].min = 0;
+    const promise = k1.turnLeft(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -346,7 +377,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.turnRight(10);
+    k1.config.command.Move[k1.config.constant.turnRight].min = 0;
+    const promise = k1.turnRight(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -370,7 +402,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.moveLeft(10);
+    k1.config.command.Move[k1.config.constant.moveLeft].min = 0;
+    const promise = k1.moveLeft(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -394,7 +427,8 @@ describe("Robot", () => {
         resolve();
       });
     });
-    const promise = k1.moveRight(10);
+    k1.config.command.Move[k1.config.constant.moveRight].min = 0;
+    const promise = k1.moveRight(1);
     await performingPromise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(k1.busy()).toBe(true);
@@ -444,7 +478,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const headPromise = k1.command("Head 101");
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     let packet = await headPromise;
     expect(call).toHaveBeenCalledTimes(1);
     expect(packet).toBeDefined();
@@ -460,7 +494,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.initialPosition();
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual(k1.jointsInitial);
@@ -476,7 +510,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.moveJoint("head", 100);
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -521,40 +555,40 @@ describe("Robot", () => {
       value23: 230,
       speed: 240,
     });
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      leftThigh: 40,
-      leftCalf: 40,
-      leftAnkle: 40,
-      rightThigh: 40,
+      leftThigh: 29,
+      leftCalf: 10,
+      leftAnkle: 26,
+      rightThigh: 30,
       rightCalf: 40,
       rightAnkle: 50,
       leftShoulder: 60,
       rightShoulder: 70,
-      leftHip: 80,
-      leftFoot: 90,
-      rightHip: 100,
+      leftHip: 103,
+      leftFoot: 93,
+      rightHip: 119,
       rightFoot: 110,
       leftArm: 120,
       leftHand: 130,
       rightArm: 140,
       rightHand: 150,
       head: 160,
-      value17: 170,
-      value18: 180,
-      value19: 190,
-      value20: 200,
-      value21: 200,
-      value22: 200,
-      value23: 200,
+      value17: 125,
+      value18: 125,
+      value19: 125,
+      value20: 100,
+      value21: 100,
+      value22: 125,
+      value23: 125,
       speed: 100,
     });
     const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
     const packet = k1.parsePacket(buffer);
     expect(packet.type).toBe(k1.config.type.jointMove.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1be82828282828323c46505a646e78828c96a0aab4bec8c8c8c86457");
+    expect(packet.raw.toString("hex")).toBe("ffff1be81d0a1a1e28323c46675d776e78828c96a07d7d7d64647d7d6440");
     expect(k1.ready()).toBe(true);
   });
 
@@ -593,40 +627,40 @@ describe("Robot", () => {
       50,
       true,
     );
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      leftThigh: -89,
-      leftCalf: -20,
-      leftAnkle: -66,
-      rightThigh: -78,
+      leftThigh: -100,
+      leftCalf: -50,
+      leftAnkle: -80,
+      rightThigh: -88,
       rightCalf: -150,
       rightAnkle: -96,
       leftShoulder: -152,
       rightShoulder: 34,
-      leftHip: -43,
-      leftFoot: -33,
-      rightHip: -29,
+      leftHip: -20,
+      leftFoot: -30,
+      rightHip: -10,
       rightFoot: -5,
       leftArm: -103,
       leftHand: 14,
       rightArm: 106,
       rightHand: 24,
       head: 38,
-      value17: 45,
-      value18: 55,
-      value19: 65,
-      value20: 100,
-      value21: 100,
-      value22: 75,
-      value23: 75,
+      value17: 0,
+      value18: 0,
+      value19: 0,
+      value20: 0,
+      value21: 0,
+      value22: 0,
+      value23: 0,
       speed: 50,
     });
     const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
     const packet = k1.parsePacket(buffer);
     expect(packet.type).toBe(k1.config.type.jointMove.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1be82828282828323c46505a646e78828c96a0aab4bec8c8c8c83225");
+    expect(packet.raw.toString("hex")).toBe("ffff1be81d0a1a1e28323c46675d776e78828c96a07d7d7d64647d7d320e");
     expect(k1.ready()).toBe(true);
   });
 
@@ -642,7 +676,7 @@ describe("Robot", () => {
       rightCalf: "-10%",
       rightAnkle: "-20",
     });
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -650,14 +684,14 @@ describe("Robot", () => {
       leftThigh: 50,
       leftCalf: 70,
       leftAnkle: 86,
-      rightThigh: 88,
-      rightCalf: 174,
+      rightThigh: 78,
+      rightCalf: 169,
       rightAnkle: 126,
     });
     const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
     const packet = k1.parsePacket(buffer);
     expect(packet.type).toBe(k1.config.type.jointMove.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1be832465658ae7ed4247b7b8173df74227e7a7d7d7d64647d7d1efb");
+    expect(packet.raw.toString("hex")).toBe("ffff1be83246564ea97ed4247b7b8173df74227e7a7d7d7d64647d7d1eec");
     expect(k1.ready()).toBe(true);
   });
 
@@ -673,7 +707,7 @@ describe("Robot", () => {
       rightCalf: 0,
       rightAnkle: -20,
     });
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -697,66 +731,66 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.moveJointsNorm({
-      leftThigh: -89,
-      leftCalf: -20,
-      leftAnkle: -66,
-      rightThigh: -78,
+      leftThigh: -100,
+      leftCalf: -50,
+      leftAnkle: -80,
+      rightThigh: -88,
       rightCalf: -150,
       rightAnkle: -96,
       leftShoulder: -152,
       rightShoulder: 34,
-      leftHip: -43,
-      leftFoot: -33,
-      rightHip: -29,
+      leftHip: -20,
+      leftFoot: -30,
+      rightHip: -10,
       rightFoot: -5,
       leftArm: -103,
       leftHand: 14,
       rightArm: 106,
       rightHand: 24,
       head: 38,
-      value17: 45,
-      value18: 55,
-      value19: 65,
-      value20: 100,
-      value21: 100,
-      value22: 75,
-      value23: 75,
+      value17: 0,
+      value18: 0,
+      value19: 0,
+      value20: 0,
+      value21: 0,
+      value22: 0,
+      value23: 0,
       speed: 50,
     });
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      leftThigh: -89,
-      leftCalf: -20,
-      leftAnkle: -66,
-      rightThigh: -78,
+      leftThigh: -100,
+      leftCalf: -50,
+      leftAnkle: -80,
+      rightThigh: -88,
       rightCalf: -150,
       rightAnkle: -96,
       leftShoulder: -152,
       rightShoulder: 34,
-      leftHip: -43,
-      leftFoot: -33,
-      rightHip: -29,
+      leftHip: -20,
+      leftFoot: -30,
+      rightHip: -10,
       rightFoot: -5,
       leftArm: -103,
       leftHand: 14,
       rightArm: 106,
       rightHand: 24,
       head: 38,
-      value17: 45,
-      value18: 55,
-      value19: 65,
-      value20: 100,
-      value21: 100,
-      value22: 75,
-      value23: 75,
+      value17: 0,
+      value18: 0,
+      value19: 0,
+      value20: 0,
+      value21: 0,
+      value22: 0,
+      value23: 0,
       speed: 50,
     });
     const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
     const packet = k1.parsePacket(buffer);
     expect(packet.type).toBe(k1.config.type.jointMove.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1be82828282828323c46505a646e78828c96a0aab4bec8c8c8c83225");
+    expect(packet.raw.toString("hex")).toBe("ffff1be81d0a1a1e28323c46675d776e78828c96a07d7d7d64647d7d320e");
     expect(k1.ready()).toBe(true);
   });
 
@@ -765,7 +799,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.headCenter();
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -784,7 +818,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.headLeft();
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -803,7 +837,7 @@ describe("Robot", () => {
       noble.notify(k1.config.type.jointMove, "", 5);
     });
     const promise = k1.headRight();
-    expect(k1.busy()).toBe(false);
+    expect(k1.busy()).toBe(true);
     const result = await promise;
     expect(moveCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
@@ -818,25 +852,36 @@ describe("Robot", () => {
   });
 
   test("Lock Joint", async () => {
+    noble.mock(async () => {
+      noble.notify(k1.config.type.jointUnlockAll, "", 5);
+    });
+    const unlockedJoints = await k1.unlockAllJoints();
     const lockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointLock, "", 5);
     });
     const promise = k1.lockJoint(k1.config.joint.head);
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(lockCall).toHaveBeenCalledTimes(1);
+    expect(lockCall).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
-      ...k1.locksInitial,
+      ...unlockedJoints,
       head: 1,
     });
-    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const packet = k1.parsePacket(buffer);
-    expect(packet.type).toBe(k1.config.type.jointLock.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1bed0000000000000000000000000000000001000000000000000009");
+    const [[unlockBuffer], [lockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const unlockPacket = k1.parsePacket(unlockBuffer);
+    expect(unlockPacket.type).toBe(k1.config.type.jointUnlockAll.code);
+    expect(unlockPacket.raw.toString("hex")).toBe("ffff02eaec");
+    const lockPacket = k1.parsePacket(lockBuffer);
+    expect(lockPacket.type).toBe(k1.config.type.jointLock.code);
+    expect(lockPacket.raw.toString("hex")).toBe("ffff13ed000000000000000000000000000000000101");
     expect(k1.ready()).toBe(true);
   });
 
   test("Lock Joints", async () => {
+    noble.mock(async () => {
+      noble.notify(k1.config.type.jointUnlockAll, "", 5);
+    });
+    await k1.unlockAllJoints();
     const lockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointLock, "", 5);
     });
@@ -858,18 +903,10 @@ describe("Robot", () => {
       rightArm: 0,
       rightHand: 1,
       head: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
-      speed: 0,
     });
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(lockCall).toHaveBeenCalledTimes(1);
+    expect(lockCall).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       leftThigh: 0,
       leftCalf: 1,
@@ -888,30 +925,29 @@ describe("Robot", () => {
       rightArm: 0,
       rightHand: 1,
       head: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
-      speed: 0,
     });
-    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const packet = k1.parsePacket(buffer);
-    expect(packet.type).toBe(k1.config.type.jointLock.code);
-    expect(packet.raw.toString("hex")).toBe("ffff1bed0001000100010001000100010001000100010001000100010014");
+    const [[unlockBuffer], [lockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const unlockPacket = k1.parsePacket(unlockBuffer);
+    expect(unlockPacket.type).toBe(k1.config.type.jointUnlockAll.code);
+    expect(unlockPacket.raw.toString("hex")).toBe("ffff02eaec");
+    const lockPacket = k1.parsePacket(lockBuffer);
+    expect(lockPacket.type).toBe(k1.config.type.jointLock.code);
+    expect(lockPacket.raw.toString("hex")).toBe("ffff13ed000100010001000100010001000100010008");
     expect(k1.ready()).toBe(true);
   });
 
   test("Lock All Joints", async () => {
+    noble.mock(async () => {
+      noble.notify(k1.config.type.jointUnlockAll, "", 5);
+    });
+    await k1.unlockAllJoints();
     const lockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointLockAll, "", 5);
     });
     const promise = k1.lockAllJoints();
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(lockCall).toHaveBeenCalledTimes(1);
+    expect(lockCall).toHaveBeenCalledTimes(2);
     expect(result).toEqual({
       leftThigh: 1,
       leftCalf: 1,
@@ -930,55 +966,37 @@ describe("Robot", () => {
       rightArm: 1,
       rightHand: 1,
       head: 1,
-      value17: 1,
-      value18: 1,
-      value19: 1,
-      value20: 1,
-      value21: 1,
-      value22: 1,
-      value23: 1,
-      speed: 1,
     });
-    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const packet = k1.parsePacket(buffer);
-    expect(packet.type).toBe(k1.config.type.jointLockAll.code);
-    expect(packet.raw.toString("hex")).toBe("ffff02ebed");
+    const [[unlockBuffer], [lockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const unlockPacket = k1.parsePacket(unlockBuffer);
+    expect(unlockPacket.type).toBe(k1.config.type.jointUnlockAll.code);
+    expect(unlockPacket.raw.toString("hex")).toBe("ffff02eaec");
+    const lockPacket = k1.parsePacket(lockBuffer);
+    expect(lockPacket.type).toBe(k1.config.type.jointLockAll.code);
+    expect(lockPacket.raw.toString("hex")).toBe("ffff02ebed");
     expect(k1.ready()).toBe(true);
   });
 
   test("Unlock Joint", async () => {
-    noble.mock(async () => {
-      noble.notify(k1.config.type.jointLock, "", 5);
-    });
-    expect(await k1.lockJoint(k1.config.joint.head)).toMatchObject({
-      head: 1,
-    });
     const lockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointLock, "", 5);
     });
     const promise = k1.unlockJoint(k1.config.joint.head);
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(lockCall).toHaveBeenCalledTimes(2);
+    expect(lockCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       ...k1.locksInitial,
       head: 0,
     });
-    const [[lockBuffer], [unlockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const lockPacket = k1.parsePacket(lockBuffer);
-    expect(lockPacket.type).toBe(k1.config.type.jointLock.code);
-    expect(lockPacket.raw.toString("hex")).toBe("ffff1bed0000000000000000000000000000000001000000000000000009");
-    const unlockPacket = k1.parsePacket(unlockBuffer);
-    expect(unlockPacket.type).toBe(k1.config.type.jointLock.code);
-    expect(unlockPacket.raw.toString("hex")).toBe("ffff1bed0000000000000000000000000000000000000000000000000008");
+    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const packet = k1.parsePacket(buffer);
+    expect(packet.type).toBe(k1.config.type.jointLock.code);
+    expect(packet.raw.toString("hex")).toBe("ffff13ed010101010101010101010101010101010010");
     expect(k1.ready()).toBe(true);
   });
 
   test("Unlock Joints", async () => {
-    noble.mock(async () => {
-      noble.notify(k1.config.type.jointLockAll, "", 5);
-    });
-    await k1.lockAllJoints();
     const unlockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointLock, "", 5);
     });
@@ -1000,18 +1018,10 @@ describe("Robot", () => {
       rightArm: 0,
       rightHand: 1,
       head: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
-      speed: 0,
     });
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(unlockCall).toHaveBeenCalledTimes(2);
+    expect(unlockCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       leftThigh: 0,
       leftCalf: 1,
@@ -1030,37 +1040,22 @@ describe("Robot", () => {
       rightArm: 0,
       rightHand: 1,
       head: 0,
-      value17: 1,
-      value18: 0,
-      value19: 1,
-      value20: 0,
-      value21: 1,
-      value22: 0,
-      value23: 1,
-      speed: 0,
     });
-    const [[lockBuffer], [unlockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const lockPacket = k1.parsePacket(lockBuffer);
-    expect(lockPacket.type).toBe(k1.config.type.jointLockAll.code);
-    expect(lockPacket.raw.toString("hex")).toBe("ffff02ebed");
-    const unlockPacket = k1.parsePacket(unlockBuffer);
-    expect(unlockPacket.type).toBe(k1.config.type.jointLock.code);
-    expect(unlockPacket.raw.toString("hex")).toBe("ffff1bed0001000100010001000100010001000100010001000100010014");
+    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const packet = k1.parsePacket(buffer);
+    expect(packet.type).toBe(k1.config.type.jointLock.code);
+    expect(packet.raw.toString("hex")).toBe("ffff13ed000100010001000100010001000100010008");
     expect(k1.ready()).toBe(true);
   });
 
   test("Unlock All Joints", async () => {
-    noble.mock(async () => {
-      noble.notify(k1.config.type.jointLockAll, "", 5);
-    });
-    await k1.lockAllJoints();
     const unlockCall = noble.mock(async () => {
       noble.notify(k1.config.type.jointUnlockAll, "", 5);
     });
     const promise = k1.unlockAllJoints();
     expect(k1.busy()).toBe(false);
     const result = await promise;
-    expect(unlockCall).toHaveBeenCalledTimes(2);
+    expect(unlockCall).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       leftThigh: 0,
       leftCalf: 0,
@@ -1079,22 +1074,11 @@ describe("Robot", () => {
       rightArm: 0,
       rightHand: 0,
       head: 0,
-      value17: 0,
-      value18: 0,
-      value19: 0,
-      value20: 0,
-      value21: 0,
-      value22: 0,
-      value23: 0,
-      speed: 0,
     });
-    const [[lockBuffer], [unlockBuffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
-    const lockPacket = k1.parsePacket(lockBuffer);
-    expect(lockPacket.type).toBe(k1.config.type.jointLockAll.code);
-    expect(lockPacket.raw.toString("hex")).toBe("ffff02ebed");
-    const unlockPacket = k1.parsePacket(unlockBuffer);
-    expect(unlockPacket.type).toBe(k1.config.type.jointUnlockAll.code);
-    expect(unlockPacket.raw.toString("hex")).toBe("ffff02eaec");
+    const [[buffer]] = noble.peripheral.characteristic.writeAsync.mock.calls;
+    const packet = k1.parsePacket(buffer);
+    expect(packet.type).toBe(k1.config.type.jointUnlockAll.code);
+    expect(packet.raw.toString("hex")).toBe("ffff02eaec");
     expect(k1.ready()).toBe(true);
   });
 });
