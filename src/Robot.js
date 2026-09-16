@@ -1483,7 +1483,27 @@ module.exports = class Robot {
       return;
     }
 
-    const stream = Readable.from(buffer);
+    const wavHeader = (dataLength, { sampleRate, channels = 1, bitsPerSample = 16 }) => {
+      const blockAlign = (channels * bitsPerSample) / 8;
+      const byteRate = sampleRate * blockAlign;
+      const header = Buffer.alloc(44);
+      header.write("RIFF", 0);
+      header.writeUInt32LE(36 + dataLength, 4);
+      header.write("WAVE", 8);
+      header.write("fmt ", 12);
+      header.writeUInt32LE(16, 16);
+      header.writeUInt16LE(1, 20);
+      header.writeUInt16LE(channels, 22);
+      header.writeUInt32LE(sampleRate, 24);
+      header.writeUInt32LE(byteRate, 28);
+      header.writeUInt16LE(blockAlign, 32);
+      header.writeUInt16LE(bitsPerSample, 34);
+      header.write("data", 36);
+      header.writeUInt32LE(dataLength, 40);
+      return header;
+    };
+    const wav = Buffer.concat([wavHeader(buffer.length, { sampleRate: this.config.recording.voice.sampleRate }), buffer]);
+    const stream = Readable.from(wav);
     stream.path = "prompt.wav";
     this.logInfo("Transcribing", "...");
     const llm = this.#llm();
