@@ -12,6 +12,7 @@ const recorder = require("node-record-lpcm16");
 
 const envPath = path.join(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   process.loadEnvFile(envPath);
 }
 
@@ -598,7 +599,7 @@ module.exports = class Robot {
       return;
     }
     this.logVerbose("Programming mode deactivated ...");
-    const packet = await this.call(
+    await this.call(
       {
         type: this.config.type.programExit,
       },
@@ -1567,6 +1568,9 @@ module.exports = class Robot {
           }),
           this.voice({ signal: controller.signal }, scope),
         ]);
+      } catch (err) {
+        controller.abort();
+        this.logError("Voice failed:", err?.message ?? err);
       } finally {
         process.stdin.setRawMode(false);
         process.stdin.pause();
